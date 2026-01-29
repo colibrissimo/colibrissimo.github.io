@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Silent Letters - Dictation Activity</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'OpenDyslexic', 'Comic Sans MS', sans-serif;
+            background: linear-gradient(135deg, #ff8c42 0%, #2a9d8f 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #1e293b;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #2a9d8f;
+            font-size: 2.2em;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #64748b;
+            margin-bottom: 24px;
+            font-size: 1.1em;
+        }
+
+        .controls {
+            background: #f1f5f9;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: #ff8c42;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        button:hover {
+            background: #e67a32;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 140, 66, 0.3);
+        }
+
+        button:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .timer {
+            font-size: 2em;
+            font-weight: bold;
+            color: #2a9d8f;
+            text-align: center;
+            margin: 16px 0;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .round-selector {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .round-btn {
+            padding: 8px 16px;
+            background: #e2e8f0;
+            color: #475569;
+            border: 2px solid transparent;
+        }
+
+        .round-btn.active {
+            background: #2a9d8f;
+            color: white;
+            border-color: #2a9d8f;
+        }
+
+        .round-btn.completed {
+            background: #10b981;
+            color: white;
+        }
+
+        .text-display {
+            line-height: 1.8;
+            font-size: 1.15em;
+            margin-bottom: 24px;
+            padding: 24px;
+            background: #fafafa;
+            border-radius: 12px;
+            border: 2px solid #e2e8f0;
+        }
+
+        .text-display p {
+            margin-bottom: 16px;
+        }
+
+        input.gap {
+            border: none;
+            border-bottom: 2px solid #2a9d8f;
+            background: transparent;
+            font-size: inherit;
+            font-family: inherit;
+            padding: 2px 8px;
+            margin: 0 4px;
+            min-width: 100px;
+            transition: all 0.2s;
+        }
+
+        input.gap:focus {
+            outline: none;
+            border-bottom-color: #ff8c42;
+            background: rgba(255, 140, 66, 0.05);
+        }
+
+        input.gap.correct {
+            border-bottom-color: #10b981;
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        input.gap.incorrect {
+            border-bottom-color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .results {
+            background: #f1f5f9;
+            padding: 24px;
+            border-radius: 12px;
+            margin-top: 24px;
+            text-align: center;
+        }
+
+        .results h2 {
+            color: #2a9d8f;
+            margin-bottom: 16px;
+        }
+
+        .score {
+            font-size: 3em;
+            font-weight: bold;
+            color: #ff8c42;
+            margin: 16px 0;
+        }
+
+        .results-detail {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .result-card {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            border: 2px solid #e2e8f0;
+        }
+
+        .result-card strong {
+            display: block;
+            color: #64748b;
+            font-size: 0.9em;
+            margin-bottom: 4px;
+        }
+
+        .result-card .value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #2a9d8f;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .instructions {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+
+        .instructions h3 {
+            color: #92400e;
+            margin-bottom: 8px;
+        }
+
+        .instructions ol {
+            margin-left: 20px;
+            color: #78350f;
+        }
+
+        .instructions li {
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤫 Silent Letters Dictation</h1>
+        <p class="subtitle">Listen carefully and spell correctly - even the letters you can't hear!</p>
+
+        <div class="instructions">
+            <h3>📋 Instructions:</h3>
+            <ol>
+                <li>Select a round (paragraph) to work on</li>
+                <li>Click "▶ Play" to hear the text - you WON'T hear the silent letters!</li>
+                <li>Type the missing words with CORRECT spelling (including silent letters)</li>
+                <li>Click "✓ Check Answers" to see your score</li>
+                <li>Complete all 4 rounds to master silent letters!</li>
+            </ol>
+        </div>
+
+        <div class="round-selector" id="round-selector"></div>
+
+        <div class="timer" id="timer">00:00</div>
+
+        <div class="controls">
+            <button id="play-btn">▶ Play</button>
+            <button id="pause-btn" disabled>⏸ Pause</button>
+            <button id="stop-btn">⏹ Stop</button>
+            <button id="check-btn">✓ Check Answers</button>
+        </div>
+
+        <div class="text-display" id="text-display"></div>
+
+        <div id="results" class="results hidden">
+            <h2>Results</h2>
+            <div class="score" id="score">0%</div>
+            <div class="results-detail">
+                <div class="result-card">
+                    <strong>Correct</strong>
+                    <div class="value" id="correct-count">0</div>
+                </div>
+                <div class="result-card">
+                    <strong>Incorrect</strong>
+                    <div class="value" id="incorrect-count">0</div>
+                </div>
+                <div class="result-card">
+                    <strong>Time</strong>
+                    <div class="value" id="time-taken">00:00</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <audio id="audio-player">
+        <source id="audio-source" type="audio/mpeg">
+    </audio>
+
+    <script>
+        // CONFIGURATION
+        const CONFIG = {
+            audioPath: '../audio/', // Path to audio files
+            rounds: [
+                {
+                    id: 1,
+                    audio: 'paragraph1.mp3',
+                    text: "It takes an hour to walk half a mile with a subtle limp.",
+                    gaps: ["hour", "half", "subtle"]
+                },
+                {
+                    id: 2,
+                    audio: 'paragraph2.mp3',
+                    text: "On Wednesday I used a knife and scissors for knitting, but I didn't listen to the knights talking about their knuckles.",
+                    gaps: ["Wednesday", "knife", "scissors", "knitting", "listen", "knights", "knuckles"]
+                },
+                {
+                    id: 3,
+                    audio: 'paragraph3.mp3',
+                    text: "The gnome stood in the cupboard eating lasagne and salmon in autumn while drinking champagne.",
+                    gaps: ["gnome", "cupboard", "autumn", "champagne", "lasagne", "salmon"]
+                },
+                {
+                    id: 4,
+                    audio: 'paragraph4.mp3',
+                    text: "It takes an hour to walk half a mile with a subtle limp. On Wednesday I used a knife and scissors for knitting, but I didn't listen to the knights talking about their knuckles. The gnome stood in the cupboard eating lasagne and salmon in autumn while drinking champagne. This whole paragraph is a combination of all previous rounds with their silent letters!",
+                    gaps: ["hour", "half", "subtle", "Wednesday", "knife", "scissors", "knitting", "listen", "knights", "knuckles", "gnome", "cupboard", "lasagne", "salmon", "autumn", "champagne", "whole", "combination"]
+                }
+            ]
+        };
+
+        // STATE
+        let currentRound = 0;
+        let timerInterval = null;
+        let startTime = null;
+        let roundScores = {};
+        const audio = document.getElementById('audio-player');
+        const audioSource = document.getElementById('audio-source');
+
+        // Initialize
+        function init() {
+            createRoundSelector();
+            loadRound(0);
+            setupEventListeners();
+        }
+
+        // Create round selector buttons
+        function createRoundSelector() {
+            const selector = document.getElementById('round-selector');
+            CONFIG.rounds.forEach((round, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'round-btn';
+                btn.textContent = `Round ${round.id}`;
+                btn.dataset.round = index;
+                btn.onclick = () => loadRound(index);
+                selector.appendChild(btn);
+            });
+            updateRoundButtons();
+        }
+
+        // Update round button states
+        function updateRoundButtons() {
+            const buttons = document.querySelectorAll('.round-btn');
+            buttons.forEach((btn, index) => {
+                btn.classList.remove('active', 'completed');
+                if (index === currentRound) {
+                    btn.classList.add('active');
+                } else if (roundScores[index] !== undefined) {
+                    btn.classList.add('completed');
+                }
+            });
+        }
+
+        // Load a specific round
+        function loadRound(roundIndex) {
+            stopAudio();
+            resetTimer();
+            
+            currentRound = roundIndex;
+            const round = CONFIG.rounds[roundIndex];
+            
+            // Set audio source
+            audioSource.src = CONFIG.audioPath + round.audio;
+            audio.load();
+            
+            document.getElementById('results').classList.add('hidden');
+            
+            // Create gapped text
+            let gappedText = round.text;
+            const sortedGaps = [...round.gaps].sort((a, b) => b.length - a.length);
+            
+            sortedGaps.forEach((word, index) => {
+                const gapId = `gap-${index}`;
+                const regex = new RegExp(`\\b${word}\\b`, 'gi');
+                let replaced = false;
+                
+                gappedText = gappedText.replace(regex, (match) => {
+                    if (!replaced) {
+                        replaced = true;
+                        return `<input type="text" class="gap" id="${gapId}" data-answer="${btoa(word.toLowerCase())}" />`;
+                    }
+                    return match;
+                });
+            });
+            
+            document.getElementById('text-display').innerHTML = `<p>${gappedText}</p>`;
+            updateRoundButtons();
+            
+            // Focus first gap
+            setTimeout(() => {
+                const firstGap = document.querySelector('.gap');
+                if (firstGap) firstGap.focus();
+            }, 100);
+        }
+
+        // Timer functions
+        function startTimer() {
+            startTime = Date.now();
+            timerInterval = setInterval(updateTimer, 100);
+        }
+
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        function resetTimer() {
+            stopTimer();
+            startTime = null;
+            document.getElementById('timer').textContent = '00:00';
+        }
+
+        function updateTimer() {
+            if (!startTime) return;
+            const elapsed = Date.now() - startTime;
+            const minutes = Math.floor(elapsed / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            document.getElementById('timer').textContent = 
+                `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function getTimerValue() {
+            return document.getElementById('timer').textContent;
+        }
+
+        // Audio functions
+        function playAudio() {
+            audio.play();
+            if (!startTime) startTimer();
+            document.getElementById('play-btn').disabled = true;
+            document.getElementById('pause-btn').disabled = false;
+        }
+
+        function pauseAudio() {
+            audio.pause();
+            document.getElementById('play-btn').disabled = false;
+            document.getElementById('pause-btn').disabled = true;
+        }
+
+        function stopAudio() {
+            audio.pause();
+            audio.currentTime = 0;
+            document.getElementById('play-btn').disabled = false;
+            document.getElementById('pause-btn').disabled = true;
+        }
+
+        // Audio event listeners
+        audio.onended = () => {
+            document.getElementById('play-btn').disabled = false;
+            document.getElementById('pause-btn').disabled = true;
+        };
+
+        // Check answers
+        function checkAnswers() {
+            const gaps = document.querySelectorAll('.gap');
+            let correct = 0;
+            let incorrect = 0;
+
+            gaps.forEach(gap => {
+                const userAnswer = gap.value.trim().toLowerCase();
+                const correctAnswer = atob(gap.dataset.answer);
+                
+                if (userAnswer === correctAnswer) {
+                    gap.classList.add('correct');
+                    gap.classList.remove('incorrect');
+                    correct++;
+                } else {
+                    gap.classList.add('incorrect');
+                    gap.classList.remove('correct');
+                    incorrect++;
+                }
+            });
+
+            const total = correct + incorrect;
+            const percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
+            
+            roundScores[currentRound] = { correct, incorrect, percentage, time: getTimerValue() };
+            
+            document.getElementById('score').textContent = `${percentage}%`;
+            document.getElementById('correct-count').textContent = correct;
+            document.getElementById('incorrect-count').textContent = incorrect;
+            document.getElementById('time-taken').textContent = getTimerValue();
+            document.getElementById('results').classList.remove('hidden');
+            
+            stopTimer();
+            stopAudio();
+            updateRoundButtons();
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            document.getElementById('play-btn').onclick = playAudio;
+            document.getElementById('pause-btn').onclick = pauseAudio;
+            document.getElementById('stop-btn').onclick = stopAudio;
+            document.getElementById('check-btn').onclick = checkAnswers;
+
+            // Enter key to move between gaps
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && e.target.classList.contains('gap')) {
+                    const gaps = Array.from(document.querySelectorAll('.gap'));
+                    const currentIndex = gaps.indexOf(e.target);
+                    if (currentIndex < gaps.length - 1) {
+                        gaps[currentIndex + 1].focus();
+                    }
+                }
+            });
+        }
+
+        // Initialize on load
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
