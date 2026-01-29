@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Silent Letters - Dictation Activity</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'OpenDyslexic', 'Comic Sans MS', sans-serif;
+            background: linear-gradient(135deg, #0891b2 0%, #367588 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #1e293b;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #367588;
+            font-size: 2.2em;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #64748b;
+            margin-bottom: 24px;
+            font-size: 1.1em;
+        }
+
+        .controls {
+            background: #f1f5f9;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .control-row:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            font-weight: 600;
+            color: #475569;
+        }
+
+        select {
+            padding: 8px 12px;
+            border: 2px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 1em;
+            background: white;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: #f97316;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        button:hover {
+            background: #ea580c;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+        }
+
+        button:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .timer {
+            font-size: 2em;
+            font-weight: bold;
+            color: #367588;
+            text-align: center;
+            margin: 16px 0;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .round-selector {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 24px;
+        }
+
+        .round-btn {
+            padding: 8px 16px;
+            background: #e2e8f0;
+            color: #475569;
+            border: 2px solid transparent;
+        }
+
+        .round-btn.active {
+            background: #367588;
+            color: white;
+            border-color: #367588;
+        }
+
+        .round-btn.completed {
+            background: #10b981;
+            color: white;
+        }
+
+        .text-display {
+            line-height: 1.8;
+            font-size: 1.15em;
+            margin-bottom: 24px;
+            padding: 24px;
+            background: #fafafa;
+            border-radius: 12px;
+            border: 2px solid #e2e8f0;
+        }
+
+        .text-display p {
+            margin-bottom: 16px;
+        }
+
+        .text-display p:last-child {
+            margin-bottom: 0;
+        }
+
+        input.gap {
+            border: none;
+            border-bottom: 2px solid #367588;
+            background: transparent;
+            font-size: inherit;
+            font-family: inherit;
+            padding: 2px 8px;
+            margin: 0 4px;
+            min-width: 100px;
+            transition: all 0.2s;
+        }
+
+        input.gap:focus {
+            outline: none;
+            border-bottom-color: #f97316;
+            background: rgba(249, 115, 22, 0.05);
+        }
+
+        input.gap.correct {
+            border-bottom-color: #10b981;
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        input.gap.incorrect {
+            border-bottom-color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .results {
+            background: #f1f5f9;
+            padding: 24px;
+            border-radius: 12px;
+            margin-top: 24px;
+            text-align: center;
+        }
+
+        .results h2 {
+            color: #367588;
+            margin-bottom: 16px;
+        }
+
+        .score {
+            font-size: 3em;
+            font-weight: bold;
+            color: #f97316;
+            margin: 16px 0;
+        }
+
+        .results-detail {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .result-card {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            border: 2px solid #e2e8f0;
+        }
+
+        .result-card strong {
+            display: block;
+            color: #64748b;
+            font-size: 0.9em;
+            margin-bottom: 4px;
+        }
+
+        .result-card .value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #367588;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .instructions {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+
+        .instructions h3 {
+            color: #92400e;
+            margin-bottom: 8px;
+        }
+
+        .instructions ol {
+            margin-left: 20px;
+            color: #78350f;
+        }
+
+        .instructions li {
+            margin-bottom: 4px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .control-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤫 Silent Letters Dictation</h1>
+        <p class="subtitle">Listen carefully and spell correctly - even the letters you can't hear!</p>
+
+        <div class="instructions">
+            <h3>📋 Instructions:</h3>
+            <ol>
+                <li>Select a round (paragraph) to work on</li>
+                <li>Choose your preferred British English voice</li>
+                <li>Click "Play Audio" to hear the text - you WON'T hear the silent letters!</li>
+                <li>Type the missing words with CORRECT spelling (including silent letters like h, k, w, b, l)</li>
+                <li>Click "Check Answers" to see your score</li>
+                <li>Complete all 4 rounds to master silent letters!</li>
+            </ol>
+        </div>
+
+        <div class="controls">
+            <div class="control-row">
+                <label for="voice-select">Voice:</label>
+                <select id="voice-select">
+                    <option value="">Loading voices...</option>
+                </select>
+                <button id="play-btn">▶ Play Audio</button>
+                <button id="pause-btn" disabled>⏸ Pause</button>
+                <button id="check-btn">✓ Check Answers</button>
+            </div>
+            <div class="control-row">
+                <label>Speed:</label>
+                <button class="speed-btn" data-speed="0.75">0.75x</button>
+                <button class="speed-btn active" data-speed="1">1x</button>
+                <button class="speed-btn" data-speed="1.25">1.25x</button>
+            </div>
+        </div>
+
+        <div class="timer" id="timer">00:00</div>
+
+        <div class="round-selector" id="round-selector"></div>
+
+        <div class="text-display" id="text-display"></div>
+
+        <div class="results hidden" id="results">
+            <h2>Round Results</h2>
+            <div class="score" id="score">0%</div>
+            <div class="results-detail">
+                <div class="result-card">
+                    <strong>Correct</strong>
+                    <div class="value" id="correct-count">0</div>
+                </div>
+                <div class="result-card">
+                    <strong>Incorrect</strong>
+                    <div class="value" id="incorrect-count">0</div>
+                </div>
+                <div class="result-card">
+                    <strong>Time Taken</strong>
+                    <div class="value" id="time-taken">00:00</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // CONFIGURATION SECTION
+        // Edit these to customize the activity
+        // ============================================
+
+        const CONFIG = {
+            rounds: [
+                {
+                    id: 1,
+                    text: `I will see you in an hour, not in our house. It takes half an hour to get there, maybe half past the hour. The journey is very subtle, you might not notice the time passing. Just half an hour of your time.`,
+                    gaps: ['hour', 'our', 'half', 'hour', 'half', 'hour', 'subtle', 'half', 'hour']
+                },
+                {
+                    id: 2,
+                    text: `On Wednesday, grab a knife from the kitchen. Use it to cut wrapping paper with scissors. My friends from school are coming, so we will need knives for everyone. They are knitting quietly while they listen to stories about knights and knuckles.`,
+                    gaps: ['Wednesday', 'knife', 'scissors', 'school', 'knives', 'knitting', 'listen', 'knights', 'knuckles']
+                },
+                {
+                    id: 3,
+                    text: `The gnome lives in the cupboard in autumn. He wrapped a receipt around some champagne and left it there. In February, we found lasagne and salmon hidden beside the gnome. What an honest gnome he is!`,
+                    gaps: ['gnome', 'cupboard', 'autumn', 'wrapped', 'receipt', 'champagne', 'February', 'lasagne', 'salmon', 'gnome', 'honest', 'gnome']
+                },
+                {
+                    id: 4,
+                    text: `There was a knock at the door on Wednesday in autumn. My friends Chloe and Isabella arrived with a knife and scissors. They brought champagne, salmon, and lasagne for our half-hour celebration. We kept the receipt in the cupboard with the gnome. The whole evening was very subtle and honest. We were completely knackered by half past the hour!`,
+                    gaps: ['knock', 'Wednesday', 'autumn', 'Chloe', 'knife', 'scissors', 'champagne', 'salmon', 'lasagne', 'half', 'receipt', 'cupboard', 'gnome', 'subtle', 'honest', 'knackered', 'half', 'hour']
+                }
+            ]
+        };
+
+        // ============================================
+        // APPLICATION CODE
+        // ============================================
+
+        let currentRound = 0;
+        let timerInterval = null;
+        let startTime = null;
+        let currentSpeech = null;
+        let currentSpeed = 1;
+        let availableVoices = [];
+        let selectedVoice = null;
+        let roundScores = {};
+
+        // Initialize
+        function init() {
+            loadVoices();
+            createRoundSelector();
+            loadRound(0);
+            setupEventListeners();
+        }
+
+        // Load available voices
+        function loadVoices() {
+            const loadVoiceList = () => {
+                availableVoices = speechSynthesis.getVoices().filter(voice => 
+                    voice.lang.startsWith('en-GB')
+                );
+                
+                const select = document.getElementById('voice-select');
+                select.innerHTML = '';
+                
+                if (availableVoices.length === 0) {
+                    select.innerHTML = '<option value="">No British voices available</option>';
+                    return;
+                }
+                
+                availableVoices.forEach((voice, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = voice.name;
+                    select.appendChild(option);
+                });
+                
+                selectedVoice = availableVoices[0];
+            };
+
+            loadVoiceList();
+            if (speechSynthesis.onvoiceschanged !== undefined) {
+                speechSynthesis.onvoiceschanged = loadVoiceList;
+            }
+        }
+
+        // Create round selector buttons
+        function createRoundSelector() {
+            const selector = document.getElementById('round-selector');
+            CONFIG.rounds.forEach((round, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'round-btn';
+                btn.textContent = `Round ${round.id}`;
+                btn.dataset.round = index;
+                btn.onclick = () => loadRound(index);
+                selector.appendChild(btn);
+            });
+            updateRoundButtons();
+        }
+
+        // Update round button states
+        function updateRoundButtons() {
+            const buttons = document.querySelectorAll('.round-btn');
+            buttons.forEach((btn, index) => {
+                btn.classList.remove('active', 'completed');
+                if (index === currentRound) {
+                    btn.classList.add('active');
+                } else if (roundScores[index] !== undefined) {
+                    btn.classList.add('completed');
+                }
+            });
+        }
+
+        // Load a specific round
+        function loadRound(roundIndex) {
+            stopAudio();
+            resetTimer();
+            
+            currentRound = roundIndex;
+            const round = CONFIG.rounds[roundIndex];
+            
+            document.getElementById('results').classList.add('hidden');
+            
+            // Create gapped text
+            let gappedText = round.text;
+            const gapMap = {};
+            
+            // Sort gaps by length (longest first) to avoid partial replacements
+            const sortedGaps = [...round.gaps].sort((a, b) => b.length - a.length);
+            
+            sortedGaps.forEach((word, index) => {
+                const gapId = `gap-${index}`;
+                gapMap[gapId] = word.toLowerCase();
+                
+                // Create case-insensitive regex
+                const regex = new RegExp(`\\b${word}\\b`, 'gi');
+                let replaced = false;
+                
+                gappedText = gappedText.replace(regex, (match) => {
+                    if (!replaced) {
+                        replaced = true;
+                        return `<input type="text" class="gap" id="${gapId}" data-answer="${btoa(word.toLowerCase())}" />`;
+                    }
+                    return match;
+                });
+            });
+            
+            document.getElementById('text-display').innerHTML = `<p>${gappedText}</p>`;
+            updateRoundButtons();
+            
+            // Focus first gap
+            setTimeout(() => {
+                const firstGap = document.querySelector('.gap');
+                if (firstGap) firstGap.focus();
+            }, 100);
+        }
+
+        // Timer functions
+        function startTimer() {
+            startTime = Date.now();
+            timerInterval = setInterval(updateTimer, 100);
+        }
+
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        function resetTimer() {
+            stopTimer();
+            startTime = null;
+            document.getElementById('timer').textContent = '00:00';
+        }
+
+        function updateTimer() {
+            if (!startTime) return;
+            const elapsed = Date.now() - startTime;
+            const minutes = Math.floor(elapsed / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            document.getElementById('timer').textContent = 
+                `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function getTimerValue() {
+            return document.getElementById('timer').textContent;
+        }
+
+        // Audio functions
+        function playAudio() {
+            if (currentSpeech) {
+                speechSynthesis.cancel();
+            }
+
+            const round = CONFIG.rounds[currentRound];
+            currentSpeech = new SpeechSynthesisUtterance(round.text);
+            currentSpeech.voice = selectedVoice;
+            currentSpeech.rate = currentSpeed;
+            currentSpeech.lang = 'en-GB';
+
+            currentSpeech.onstart = () => {
+                if (!startTime) startTimer();
+                document.getElementById('play-btn').disabled = true;
+                document.getElementById('pause-btn').disabled = false;
+            };
+
+            currentSpeech.onend = () => {
+                document.getElementById('play-btn').disabled = false;
+                document.getElementById('pause-btn').disabled = true;
+            };
+
+            speechSynthesis.speak(currentSpeech);
+        }
+
+        function pauseAudio() {
+            speechSynthesis.pause();
+            document.getElementById('play-btn').disabled = false;
+            document.getElementById('pause-btn').disabled = true;
+        }
+
+        function stopAudio() {
+            speechSynthesis.cancel();
+            currentSpeech = null;
+            document.getElementById('play-btn').disabled = false;
+            document.getElementById('pause-btn').disabled = true;
+        }
+
+        // Check answers
+        function checkAnswers() {
+            const gaps = document.querySelectorAll('.gap');
+            let correct = 0;
+            let incorrect = 0;
+
+            gaps.forEach(gap => {
+                const userAnswer = gap.value.trim().toLowerCase();
+                const correctAnswer = atob(gap.dataset.answer);
+                
+                if (userAnswer === correctAnswer) {
+                    gap.classList.add('correct');
+                    gap.classList.remove('incorrect');
+                    correct++;
+                } else {
+                    gap.classList.add('incorrect');
+                    gap.classList.remove('correct');
+                    incorrect++;
+                }
+            });
+
+            const total = correct + incorrect;
+            const percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
+            
+            roundScores[currentRound] = { correct, incorrect, percentage, time: getTimerValue() };
+            
+            document.getElementById('score').textContent = `${percentage}%`;
+            document.getElementById('correct-count').textContent = correct;
+            document.getElementById('incorrect-count').textContent = incorrect;
+            document.getElementById('time-taken').textContent = getTimerValue();
+            document.getElementById('results').classList.remove('hidden');
+            
+            stopTimer();
+            stopAudio();
+            updateRoundButtons();
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            document.getElementById('play-btn').onclick = playAudio;
+            document.getElementById('pause-btn').onclick = pauseAudio;
+            document.getElementById('check-btn').onclick = checkAnswers;
+            
+            document.getElementById('voice-select').onchange = (e) => {
+                selectedVoice = availableVoices[e.target.value];
+            };
+
+            document.querySelectorAll('.speed-btn').forEach(btn => {
+                btn.onclick = () => {
+                    document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentSpeed = parseFloat(btn.dataset.speed);
+                };
+            });
+
+            // Enter key to move between gaps
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && e.target.classList.contains('gap')) {
+                    const gaps = Array.from(document.querySelectorAll('.gap'));
+                    const currentIndex = gaps.indexOf(e.target);
+                    if (currentIndex < gaps.length - 1) {
+                        gaps[currentIndex + 1].focus();
+                    }
+                }
+            });
+        }
+
+        // Initialize on load
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
