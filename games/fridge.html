@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>The Vintage Fridge — Countable vs Uncountable</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Lexend:wght@300;400;500;600&display=swap');
+
+  :root {
+    --cream: #F5F0E8;
+    --orange: #E8723A;
+    --orange-light: #F4A261;
+    --teal: #5B8A8A;
+    --teal-dark: #3D6B6B;
+    --charcoal: #2D2D2D;
+    --charcoal-light: #4A4A4A;
+    --warm-white: #FEFCF7;
+    --success-green: #6B9E6B;
+    --error-red: #C45B4A;
+    --shadow: rgba(45, 45, 45, 0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Lexend', sans-serif;
+    background: var(--cream);
+    background-image: 
+      radial-gradient(circle at 20% 80%, rgba(91,138,138,0.06) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(232,114,58,0.06) 0%, transparent 50%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+    overflow-x: hidden;
+    /* Paper texture noise */
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .game-container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  /* ---- HEADER ---- */
+  .header {
+    text-align: center;
+    margin-bottom: 4px;
+  }
+
+  .header h1 {
+    font-family: 'Courier Prime', monospace;
+    font-size: 1.3rem;
+    color: var(--charcoal);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .header .subtitle {
+    font-size: 0.8rem;
+    color: var(--teal-dark);
+    font-weight: 300;
+    letter-spacing: 1px;
+  }
+
+  /* ---- VU GAUGES ---- */
+  .gauges-panel {
+    background: var(--charcoal);
+    border-radius: 12px;
+    padding: 12px 20px;
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 
+      0 4px 12px var(--shadow),
+      inset 0 1px 0 rgba(255,255,255,0.05);
+    width: 100%;
+    border: 2px solid var(--charcoal-light);
+  }
+
+  .gauge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+  }
+
+  .gauge-label {
+    font-family: 'Courier Prime', monospace;
+    font-size: 0.6rem;
+    color: var(--orange-light);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+
+  .gauge-meter {
+    width: 100%;
+    height: 8px;
+    background: var(--charcoal-light);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+
+  .gauge-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 4px;
+    transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .gauge-fill.countable { background: var(--teal); }
+  .gauge-fill.uncountable { background: var(--orange); }
+
+  .gauge-count {
+    font-family: 'Courier Prime', monospace;
+    font-size: 0.7rem;
+    color: var(--warm-white);
+  }
+
+  /* ---- SCORE ---- */
+  .score-row {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    font-family: 'Courier Prime', monospace;
+    font-size: 0.75rem;
+    color: var(--charcoal-light);
+  }
+
+  /* ---- FRIDGE ---- */
+  .fridge-wrapper {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 3/4;
+    max-height: 50vh;
+  }
+
+  .fridge {
+    width: 100%;
+    height: 100%;
+    background: var(--warm-white);
+    border-radius: 16px;
+    border: 4px solid var(--orange);
+    box-shadow: 
+      0 8px 24px var(--shadow),
+      inset 0 0 0 2px rgba(232,114,58,0.15);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .fridge-divider {
+    height: 4px;
+    background: var(--orange);
+    position: relative;
+  }
+
+  .fridge-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    padding: 8px;
+  }
+
+  .fridge-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+    margin-bottom: 4px;
+  }
+
+  .fridge-section-label {
+    font-family: 'Courier Prime', monospace;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    opacity: 0.6;
+  }
+
+  .section-countable .fridge-section-label { color: var(--teal-dark); }
+  .section-uncountable .fridge-section-label { color: var(--orange); }
+
+  .shelf {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 6px;
+    padding: 6px;
+    border-bottom: 2px solid rgba(45,45,45,0.08);
+    min-height: 40px;
+  }
+
+  .shelf:last-child { border-bottom: none; }
+
+  /* Handle */
+  .fridge-handle {
+    position: absolute;
+    right: 10px;
+    width: 6px;
+    height: 40px;
+    background: var(--orange);
+    border-radius: 3px;
+    box-shadow: 1px 1px 3px var(--shadow);
+  }
+
+  .section-countable .fridge-handle { top: calc(50% - 20px); }
+  .section-uncountable .fridge-handle { top: calc(50% - 20px); }
+
+  /* Placed word magnets in fridge */
+  .placed-word {
+    font-family: 'Courier Prime', monospace;
+    font-size: 0.7rem;
+    padding: 4px 10px;
+    border-radius: 6px;
+    animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 1px 2px 4px var(--shadow);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  .placed-word.countable {
+    background: var(--teal);
+    color: var(--warm-white);
+  }
+
+  .placed-word.uncountable {
+    background: var(--orange);
+    color: var(--warm-white);
+  }
+
+  @keyframes popIn {
+    0% { transform: scale(0); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  /* ---- TAP ZONES ---- */
+  .tap-zones {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .tap-zone {
+    flex: 1;
+    padding: 14px;
+    border-radius: 12px;
+    text-align: center;
+    font-family: 'Courier Prime', monospace;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 3px solid transparent;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .tap-zone:active {
+    transform: scale(0.96);
+  }
+
+  .tap-zone.countable {
+    background: rgba(91,138,138,0.12);
+    color: var(--teal-dark);
+    border-color: var(--teal);
+  }
+
+  .tap-zone.countable:hover, .tap-zone.countable:active {
+    background: rgba(91,138,138,0.25);
+  }
+
+  .tap-zone.uncountable {
+    background: rgba(232,114,58,0.12);
+    color: var(--orange);
+    border-color: var(--orange);
+  }
+
+  .tap-zone.uncountable:hover, .tap-zone.uncountable:active {
+    background: rgba(232,114,58,0.25);
+  }
+
+  .tap-zone.disabled {
+    opacity: 0.3;
+    pointer-events: none;
+  }
+
+  /* ---- CURRENT WORD MAGNET ---- */
+  .magnet-area {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 56px;
+  }
+
+  .current-magnet {
+    font-family: 'Courier Prime', monospace;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--charcoal);
+    background: var(--warm-white);
+    padding: 12px 28px;
+    border-radius: 10px;
+    box-shadow: 
+      2px 3px 8px var(--shadow),
+      0 0 0 2px var(--charcoal);
+    letter-spacing: 2px;
+    text-transform: lowercase;
+    position: relative;
+    transition: all 0.3s ease;
+  }
+
+  .current-magnet::before {
+    content: '';
+    position: absolute;
+    top: 4px;
+    left: 8px;
+    right: 8px;
+    height: 3px;
+    background: linear-gradient(90deg, var(--orange), var(--teal));
+    border-radius: 2px;
+    opacity: 0.4;
+  }
+
+  .current-magnet.shake {
+    animation: magnetShake 0.5s ease;
+  }
+
+  .current-magnet.correct {
+    animation: magnetCorrect 0.3s ease;
+  }
+
+  @keyframes magnetShake {
+    0%, 100% { transform: translateX(0); }
+    15% { transform: translateX(-8px) rotate(-2deg); }
+    30% { transform: translateX(8px) rotate(2deg); }
+    45% { transform: translateX(-6px) rotate(-1deg); }
+    60% { transform: translateX(6px) rotate(1deg); }
+    75% { transform: translateX(-3px); }
+  }
+
+  @keyframes magnetCorrect {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(0); opacity: 0; }
+  }
+
+  /* ---- FEEDBACK ---- */
+  .feedback {
+    font-family: 'Lexend', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 400;
+    min-height: 24px;
+    text-align: center;
+    transition: all 0.3s ease;
+  }
+
+  .feedback.correct { color: var(--success-green); }
+  .feedback.wrong { color: var(--error-red); }
+  .feedback.hint { color: var(--teal-dark); font-style: italic; }
+
+  /* ---- CELEBRATION ---- */
+  .celebration {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(45,45,45,0.85);
+    z-index: 100;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 24px;
+  }
+
+  .celebration.active {
+    display: flex;
+    animation: fadeIn 0.5s ease;
+  }
+
+  .celebration h2 {
+    font-family: 'Courier Prime', monospace;
+    color: var(--orange-light);
+    font-size: 1.6rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  .celebration .stats {
+    color: var(--warm-white);
+    font-size: 0.9rem;
+    text-align: center;
+    line-height: 1.8;
+  }
+
+  .celebration .stats span {
+    font-family: 'Courier Prime', monospace;
+    color: var(--orange-light);
+    font-weight: 700;
+  }
+
+  .play-again {
+    margin-top: 12px;
+    font-family: 'Courier Prime', monospace;
+    font-size: 0.9rem;
+    padding: 12px 32px;
+    background: var(--orange);
+    color: var(--warm-white);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+  }
+
+  .play-again:hover { background: var(--orange-light); }
+
+  @keyframes fadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+
+  /* ---- INTRO SCREEN ---- */
+  .intro-screen {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--cream);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 32px;
+    text-align: center;
+  }
+
+  .intro-screen.hidden { display: none; }
+
+  .intro-fridge-icon {
+    font-size: 4rem;
+    animation: gentleBounce 2s ease-in-out infinite;
+  }
+
+  @keyframes gentleBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .intro-screen h1 {
+    font-family: 'Courier Prime', monospace;
+    font-size: 1.5rem;
+    color: var(--charcoal);
+    letter-spacing: 2px;
+  }
+
+  .intro-screen p {
+    font-size: 0.85rem;
+    color: var(--charcoal-light);
+    line-height: 1.6;
+    max-width: 300px;
+  }
+
+  .intro-screen .instructions {
+    background: rgba(91,138,138,0.08);
+    padding: 16px;
+    border-radius: 12px;
+    border-left: 3px solid var(--teal);
+  }
+
+  .start-btn {
+    font-family: 'Courier Prime', monospace;
+    font-size: 1rem;
+    padding: 14px 40px;
+    background: var(--orange);
+    color: var(--warm-white);
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    box-shadow: 0 4px 12px rgba(232,114,58,0.3);
+    transition: all 0.2s ease;
+  }
+
+  .start-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(232,114,58,0.4);
+  }
+
+  /* ---- RESPONSIVE ---- */
+  @media (max-height: 700px) {
+    .fridge-wrapper { max-height: 45vh; }
+    .current-magnet { font-size: 1.1rem; padding: 10px 24px; }
+  }
+
+  /* Dyslexia-friendly: Lexend is already good for this */
+</style>
+</head>
+<body>
+
+<!-- INTRO SCREEN -->
+<div class="intro-screen" id="introScreen">
+  <div class="intro-fridge-icon">🧊</div>
+  <h1>The Vintage Fridge</h1>
+  <p>Sort the food into the right shelf!</p>
+  <div class="instructions">
+    <p><strong style="color:var(--teal)">Top shelf</strong> → Countable nouns<br>
+    <span style="font-size:0.75rem; color:var(--charcoal-light)">Things you can count: an egg, two eggs...</span></p>
+    <br>
+    <p><strong style="color:var(--orange)">Bottom shelf</strong> → Uncountable nouns<br>
+    <span style="font-size:0.75rem; color:var(--charcoal-light)">Things you can't count: some rice, some milk...</span></p>
+  </div>
+  <button class="start-btn" onclick="startGame()">Open the Fridge</button>
+</div>
+
+<!-- GAME -->
+<div class="game-container" id="gameContainer" style="display:none">
+  
+  <div class="header">
+    <h1>The Vintage Fridge</h1>
+    <div class="subtitle">Countable vs Uncountable</div>
+  </div>
+
+  <!-- Gauges -->
+  <div class="gauges-panel">
+    <div class="gauge">
+      <div class="gauge-label">Countable</div>
+      <div class="gauge-meter">
+        <div class="gauge-fill countable" id="gaugeCountable"></div>
+      </div>
+      <div class="gauge-count"><span id="countCountable">0</span>/7</div>
+    </div>
+    <div class="gauge">
+      <div class="gauge-label">Uncountable</div>
+      <div class="gauge-meter">
+        <div class="gauge-fill uncountable" id="gaugeUncountable"></div>
+      </div>
+      <div class="gauge-count"><span id="countUncountable">0</span>/7</div>
+    </div>
+  </div>
+
+  <!-- Score -->
+  <div class="score-row">
+    <span>Word <span id="currentIndex">1</span>/14</span>
+    <span>Streak: <span id="streak">0</span>🔥</span>
+    <span>Errors: <span id="errors">0</span></span>
+  </div>
+
+  <!-- Fridge -->
+  <div class="fridge-wrapper">
+    <div class="fridge">
+      <div class="fridge-section section-countable">
+        <div class="fridge-section-header">
+          <span class="fridge-section-label">▲ Countable</span>
+        </div>
+        <div class="shelf" id="shelfCountable1"></div>
+        <div class="shelf" id="shelfCountable2"></div>
+        <div class="fridge-handle"></div>
+      </div>
+      <div class="fridge-divider"></div>
+      <div class="fridge-section section-uncountable">
+        <div class="fridge-section-header">
+          <span class="fridge-section-label">▼ Uncountable</span>
+        </div>
+        <div class="shelf" id="shelfUncountable1"></div>
+        <div class="shelf" id="shelfUncountable2"></div>
+        <div class="fridge-handle"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Current word -->
+  <div class="magnet-area">
+    <div class="current-magnet" id="currentMagnet">egg</div>
+  </div>
+
+  <!-- Feedback -->
+  <div class="feedback" id="feedback">&nbsp;</div>
+
+  <!-- Tap zones -->
+  <div class="tap-zones">
+    <div class="tap-zone countable" id="tapCountable" onclick="makeGuess('countable')">
+      ▲ Countable
+    </div>
+    <div class="tap-zone uncountable" id="tapUncountable" onclick="makeGuess('uncountable')">
+      ▼ Uncountable
+    </div>
+  </div>
+
+</div>
+
+<!-- CELEBRATION -->
+<div class="celebration" id="celebration">
+  <h2>Fridge Full!</h2>
+  <div class="stats" id="celebrationStats"></div>
+  <button class="play-again" onclick="resetGame()">Play Again</button>
+</div>
+
+<script>
+  // ---- GAME DATA ----
+  const words = [
+    // Countable — confidence builders first
+    { word: 'egg', category: 'countable', hint: 'one egg, two eggs' },
+    { word: 'apple', category: 'countable', hint: 'one apple, three apples' },
+    { word: 'carrot', category: 'countable', hint: 'one carrot, five carrots 🥕' },
+    { word: 'biscuit', category: 'countable', hint: 'one biscuit, a packet of biscuits' },
+    { word: 'onion', category: 'countable', hint: 'one onion, two onions' },
+    { word: 'tomato', category: 'countable', hint: 'one tomato, four tomatoes' },
+    { word: 'grape', category: 'countable', hint: 'one grape, a bunch of grapes' },
+    // Uncountable — confidence builders first
+    { word: 'rice', category: 'uncountable', hint: 'some rice (not *a rice*)' },
+    { word: 'milk', category: 'uncountable', hint: 'some milk (not *a milk*)' },
+    { word: 'sugar', category: 'uncountable', hint: 'some sugar (not *a sugar*)' },
+    { word: 'butter', category: 'uncountable', hint: 'some butter (not *a butter*)' },
+    { word: 'bread', category: 'uncountable', hint: '⚡ "some bread" — not "a bread"! (a loaf, a slice...)' },
+    { word: 'pasta', category: 'uncountable', hint: '⚡ "some pasta" — not "a pasta"! (different from French!)' },
+    { word: 'cheese', category: 'uncountable', hint: '⚡ usually uncountable: "some cheese" (a slice, a piece...)' },
+  ];
+
+  // ---- GAME STATE ----
+  let shuffledWords = [];
+  let currentIdx = 0;
+  let countablePlaced = 0;
+  let uncountablePlaced = 0;
+  let streak = 0;
+  let errors = 0;
+  let totalAttempts = 0;
+  let isProcessing = false;
+
+  // ---- FUNCTIONS ----
+  function shuffle(arr) {
+    const a = [...arr];
+    // Keep first 2 easy ones, shuffle the rest
+    const easyStart = [a[0], a[7]]; // egg (countable) and rice (uncountable)
+    const rest = a.filter((_, i) => i !== 0 && i !== 7);
+    for (let i = rest.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [rest[i], rest[j]] = [rest[j], rest[i]];
+    }
+    return [...easyStart, ...rest];
+  }
+
+  function startGame() {
+    document.getElementById('introScreen').classList.add('hidden');
+    document.getElementById('gameContainer').style.display = 'flex';
+    shuffledWords = shuffle(words);
+    currentIdx = 0;
+    countablePlaced = 0;
+    uncountablePlaced = 0;
+    streak = 0;
+    errors = 0;
+    totalAttempts = 0;
+    isProcessing = false;
+    updateDisplay();
+  }
+
+  function updateDisplay() {
+    if (currentIdx >= shuffledWords.length) {
+      showCelebration();
+      return;
+    }
+
+    const word = shuffledWords[currentIdx];
+    document.getElementById('currentMagnet').textContent = word.word;
+    document.getElementById('currentMagnet').className = 'current-magnet';
+    document.getElementById('currentIndex').textContent = currentIdx + 1;
+    document.getElementById('streak').textContent = streak;
+    document.getElementById('errors').textContent = errors;
+    document.getElementById('feedback').innerHTML = '&nbsp;';
+    document.getElementById('feedback').className = 'feedback';
+
+    // Update gauges
+    document.getElementById('gaugeCountable').style.width = `${(countablePlaced / 7) * 100}%`;
+    document.getElementById('gaugeUncountable').style.width = `${(uncountablePlaced / 7) * 100}%`;
+    document.getElementById('countCountable').textContent = countablePlaced;
+    document.getElementById('countUncountable').textContent = uncountablePlaced;
+
+    // Enable tap zones
+    document.getElementById('tapCountable').classList.remove('disabled');
+    document.getElementById('tapUncountable').classList.remove('disabled');
+  }
+
+  function makeGuess(guess) {
+    if (isProcessing) return;
+    isProcessing = true;
+    totalAttempts++;
+
+    const word = shuffledWords[currentIdx];
+    const magnet = document.getElementById('currentMagnet');
+    const feedback = document.getElementById('feedback');
+
+    if (guess === word.category) {
+      // CORRECT
+      streak++;
+      magnet.classList.add('correct');
+      feedback.textContent = streak > 2 ? `✓ ${streak} in a row!` : '✓';
+      feedback.className = 'feedback correct';
+
+      // Disable zones while animating
+      document.getElementById('tapCountable').classList.add('disabled');
+      document.getElementById('tapUncountable').classList.add('disabled');
+
+      setTimeout(() => {
+        placeWord(word);
+        currentIdx++;
+        isProcessing = false;
+        updateDisplay();
+      }, 350);
+
+    } else {
+      // WRONG
+      streak = 0;
+      errors++;
+      magnet.classList.add('shake');
+      feedback.textContent = word.hint;
+      feedback.className = 'feedback wrong';
+
+      setTimeout(() => {
+        magnet.classList.remove('shake');
+        isProcessing = false;
+        // Don't advance — they try again
+      }, 600);
+    }
+  }
+
+  function placeWord(word) {
+    const span = document.createElement('span');
+    span.className = `placed-word ${word.category}`;
+    span.textContent = word.word;
+
+    if (word.category === 'countable') {
+      countablePlaced++;
+      const shelf = countablePlaced <= 4 ? 
+        document.getElementById('shelfCountable1') : 
+        document.getElementById('shelfCountable2');
+      shelf.appendChild(span);
+    } else {
+      uncountablePlaced++;
+      const shelf = uncountablePlaced <= 4 ? 
+        document.getElementById('shelfUncountable1') : 
+        document.getElementById('shelfUncountable2');
+      shelf.appendChild(span);
+    }
+  }
+
+  function showCelebration() {
+    const accuracy = Math.round((shuffledWords.length / totalAttempts) * 100);
+    const stats = document.getElementById('celebrationStats');
+    
+    let message = '';
+    if (errors === 0) {
+      message = `<p>🧊 Perfect score! Not a single error.</p>`;
+    } else if (errors <= 3) {
+      message = `<p>The fridge is stocked!</p>`;
+    } else {
+      message = `<p>The fridge is full — well done for sticking with it.</p>`;
+    }
+    
+    message += `<br><p>Accuracy: <span>${accuracy}%</span></p>`;
+    message += `<p>Errors: <span>${errors}</span></p>`;
+    
+    if (errors > 0) {
+      message += `<br><p style="font-size:0.75rem; opacity:0.7">💡 The tricky ones: bread, pasta, and cheese are usually uncountable in English!</p>`;
+    }
+
+    stats.innerHTML = message;
+    document.getElementById('celebration').classList.add('active');
+  }
+
+  function resetGame() {
+    document.getElementById('celebration').classList.remove('active');
+    
+    // Clear shelves
+    ['shelfCountable1', 'shelfCountable2', 'shelfUncountable1', 'shelfUncountable2']
+      .forEach(id => document.getElementById(id).innerHTML = '');
+    
+    startGame();
+  }
+
+  // Keyboard support for desktop
+  document.addEventListener('keydown', (e) => {
+    if (document.getElementById('introScreen').classList.contains('hidden')) {
+      if (e.key === 'ArrowUp' || e.key === 'c' || e.key === 'C') {
+        makeGuess('countable');
+      } else if (e.key === 'ArrowDown' || e.key === 'u' || e.key === 'U') {
+        makeGuess('uncountable');
+      }
+    } else if (e.key === 'Enter') {
+      startGame();
+    }
+  });
+</script>
+
+</body>
+</html>
