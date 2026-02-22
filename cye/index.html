@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>CYE · Numbers</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cream:        #FAF7F2;
+      --shadow-light: rgba(255, 255, 255, 0.85);
+      --shadow-dark:  rgba(180, 165, 140, 0.5);
+      --teal:         #0891B2;
+      --orange:       #F97316;
+      --text:         #5C4A2A;
+      --text-soft:    #8B7355;
+    }
+
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+
+    .stage {
+      width: 100vw;
+      height: 100vh;
+      background-image: url('images/cye_bg_counting_png.png');
+      background-size: cover;
+      background-position: center center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 48px;
+      transition: background-position 0.15s ease-out;
+    }
+
+    .stage.pressed { background-position: calc(50% + 3px) calc(50% + 4px); }
+
+    .button-row {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .num-btn {
+      font-family: 'Nunito', sans-serif;
+      font-weight: 900;
+      font-size: 1.6rem;
+      color: var(--text);
+      background: var(--cream);
+      border: none;
+      cursor: pointer;
+      outline: none;
+      position: relative;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      transition: box-shadow 0.12s ease-out, transform 0.12s ease-out, color 0.15s ease;
+      box-shadow:
+        -6px -6px 14px 0 var(--shadow-light),
+        -3px -3px  6px 0 var(--shadow-light),
+         6px  6px 14px 0 var(--shadow-dark),
+         3px  3px  6px 0 var(--shadow-dark);
+    }
+
+    .soft { width: 80px; height: 80px; border-radius: 50%; }
+    .firm { width: 80px; height: 80px; border-radius: 20px; }
+
+    .soft.pressed {
+      transform: scale(0.94);
+      color: var(--teal);
+      box-shadow:
+        inset  5px  5px 12px 0 rgba(180, 165, 140, 0.45),
+        inset -3px -3px  8px 0 rgba(255, 255, 255, 0.8),
+        0 0 0 2px rgba(8, 145, 178, 0.15);
+    }
+
+    .firm.pressed {
+      transform: scale(0.94);
+      color: var(--orange);
+      box-shadow:
+        inset  5px  5px 12px 0 rgba(180, 165, 140, 0.55),
+        inset -3px -3px  8px 0 rgba(255, 255, 255, 0.75),
+        0 0 0 2px rgba(249, 115, 22, 0.12);
+    }
+
+    .btn-word {
+      position: absolute;
+      bottom: -28px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Nunito', sans-serif;
+      font-weight: 700;
+      font-size: 0.72rem;
+      letter-spacing: 0.05em;
+      color: var(--text-soft);
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .num-btn.pressed .btn-word { opacity: 1; }
+
+    #bloom-canvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .hint {
+      font-family: 'Nunito', sans-serif;
+      font-size: 0.8rem;
+      color: var(--text-soft);
+      opacity: 0.6;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="bloom-canvas"></canvas>
+
+<div class="stage" id="stage">
+  <p class="hint">press a number</p>
+
+  <div class="button-row">
+    <button class="num-btn soft" data-num="01" data-word="one">1<span class="btn-word">one</span></button>
+    <button class="num-btn soft" data-num="02" data-word="two">2<span class="btn-word">two</span></button>
+    <button class="num-btn soft" data-num="03" data-word="three">3<span class="btn-word">three</span></button>
+    <button class="num-btn soft" data-num="04" data-word="four">4<span class="btn-word">four</span></button>
+    <button class="num-btn soft" data-num="05" data-word="five">5<span class="btn-word">five</span></button>
+  </div>
+
+  <div class="button-row">
+    <button class="num-btn firm" data-num="06" data-word="six">6<span class="btn-word">six</span></button>
+    <button class="num-btn firm" data-num="07" data-word="seven">7<span class="btn-word">seven</span></button>
+    <button class="num-btn firm" data-num="08" data-word="eight">8<span class="btn-word">eight</span></button>
+    <button class="num-btn firm" data-num="09" data-word="nine">9<span class="btn-word">nine</span></button>
+    <button class="num-btn firm" data-num="10" data-word="ten">10<span class="btn-word">ten</span></button>
+  </div>
+</div>
+
+<script>
+  const stage = document.getElementById('stage');
+  const canvas = document.getElementById('bloom-canvas');
+  const ctx = canvas.getContext('2d');
+  const buttons = document.querySelectorAll('.num-btn');
+  const blooms = [];
+
+  // Pre-load all audio files
+  const audioFiles = {};
+  buttons.forEach(btn => {
+    const num = btn.dataset.num;
+    const word = btn.dataset.word;
+    const audio = new Audio(`audio/cye_counting_audio_${num}_${word}.mp3`);
+    audio.preload = 'auto';
+    audioFiles[num] = audio;
+  });
+
+  function playAudio(num) {
+    const audio = audioFiles[num];
+    if (!audio) return;
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+  }
+
+  function resizeCanvas() {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  function createBloom(x, y, isSoft) {
+    const colour = isSoft
+      ? { r: 8,   g: 145, b: 178 }
+      : { r: 249, g: 115, b: 22  };
+    blooms.push({
+      x, y, colour,
+      radius: 0,
+      maxRadius: isSoft ? 120 : 95,
+      alpha: isSoft ? 0.22 : 0.28,
+      speed: isSoft ? 2.2 : 3.0,
+      offsets: Array.from({ length: 6 }, () => ({
+        dx: (Math.random() - 0.5) * 28,
+        dy: (Math.random() - 0.5) * 28,
+        r:  Math.random() * 0.6 + 0.7,
+      })),
+      born: performance.now(),
+      duration: isSoft ? 700 : 550,
+    });
+  }
+
+  function drawBlooms(now) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let i = blooms.length - 1; i >= 0; i--) {
+      const b = blooms[i];
+      const progress = Math.min((now - b.born) / b.duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 2);
+      b.radius = eased * b.maxRadius;
+      const alphaProgress = progress < 0.3 ? progress / 0.3 : 1 - ((progress - 0.3) / 0.7);
+      const a = b.alpha * alphaProgress;
+      if (a > 0.003) {
+        const { r, g, b: bl } = b.colour;
+        const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.radius);
+        grad.addColorStop(0,   `rgba(${r},${g},${bl},${a * 0.4})`);
+        grad.addColorStop(0.4, `rgba(${r},${g},${bl},${a})`);
+        grad.addColorStop(1,   `rgba(${r},${g},${bl},0)`);
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+        b.offsets.forEach(off => {
+          const ox = b.x + off.dx * eased;
+          const oy = b.y + off.dy * eased;
+          const or = b.radius * off.r * 0.55;
+          const og = ctx.createRadialGradient(ox, oy, 0, ox, oy, or);
+          og.addColorStop(0, `rgba(${r},${g},${bl},${a * 0.5})`);
+          og.addColorStop(1, `rgba(${r},${g},${bl},0)`);
+          ctx.beginPath();
+          ctx.arc(ox, oy, or, 0, Math.PI * 2);
+          ctx.fillStyle = og;
+          ctx.fill();
+        });
+      } else {
+        blooms.splice(i, 1);
+      }
+    }
+    requestAnimationFrame(drawBlooms);
+  }
+  requestAnimationFrame(drawBlooms);
+
+  buttons.forEach(btn => {
+    const isSoft = btn.classList.contains('soft');
+    const num = btn.dataset.num;
+
+    function press(x, y) {
+      btn.classList.add('pressed');
+      stage.classList.add('pressed');
+      createBloom(x, y, isSoft);
+      playAudio(num);
+    }
+
+    function release() {
+      btn.classList.remove('pressed');
+      stage.classList.remove('pressed');
+    }
+
+    btn.addEventListener('touchstart', e => { e.preventDefault(); const t = e.touches[0]; press(t.clientX, t.clientY); }, { passive: false });
+    btn.addEventListener('touchend', release);
+    btn.addEventListener('mousedown', e => press(e.clientX, e.clientY));
+    btn.addEventListener('mouseup', release);
+    btn.addEventListener('mouseleave', release);
+  });
+</script>
+
+</body>
+</html>
