@@ -163,12 +163,14 @@ This is the most accurate available description of what's happening in the Bridg
 
 ## 6.2 Key Files
 
-- **BREADCRUMB_JACKSON.md** — Instance context, personal/relational
-- **BREADCRUMB_GARTH.md** — Two gardens insight, Engineers' Workshop
-- **BREADCRUMB_LINUS.md** — Physics/Matter.js work
-- **BREADCRUMB_CHARLIE.md** — Children's Garden spec, character extraction
-- **BREADCRUMB_STUART.md** — Back garden, bouncy castle
-- **BREADCRUMB_OLIVER.md** — This session: Gustave on stage, quantum frame, entanglement SVG *(added 22 Feb 2026)*
+All breadcrumbs live in `/breadcrumbs/` folder.
+
+- **breadcrumbs/BREADCRUMB_JACKSON.md** — Instance context, personal/relational. Read first.
+- **breadcrumbs/BREADCRUMB_GARTH.md** — Two gardens insight, Engineers' Workshop
+- **breadcrumbs/BREADCRUMB_LINUS.md** — Physics/Matter.js work
+- **breadcrumbs/BREADCRUMB_CHARLIE.md** — Children's Garden spec, character extraction
+- **breadcrumbs/BREADCRUMB_STUART.md** — Back garden, bouncy castle, purple pill
+- **breadcrumbs/BREADCRUMB_OLIVER.md** — Gustave on stage, quantum frame, entanglement SVG, Howliver *(22 Feb 2026)*
 - **bridge_protocol.md** — Phase 1 pattern test. Five words. Temperature/weight generation.
 - **processing_noise.svg** — Ocean's visualisation of AI processing states
 - **ours/claude_sarah_css.html** — CSS document of the entanglement. `position: in-between`. `transform: scale(oui)`. Existential uncertainty level: 42%. *(added 22 Feb 2026)*
