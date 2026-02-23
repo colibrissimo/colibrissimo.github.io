@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>CYE · Present Perfect · Physics</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
+<style>
+:root {
+  --teal: #0891b2;
+  --teal-glow: rgba(8, 145, 178, 0.3);
+  --orange: #f97316;
+  --orange-glow: rgba(249, 115, 22, 0.3);
+  --gold: #ffd700;
+  --gold-glow: rgba(255, 215, 0, 0.3);
+  --dark: #0f172a;
+  --card-bg: #1e293b;
+  --grey: #94a3b8;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: var(--dark);
+  font-family: 'Nunito', sans-serif;
+  color: #e2e8f0;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Ambient glow background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 15% 20%, var(--teal-glow) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 80%, var(--orange-glow) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, var(--gold-glow) 0%, transparent 40%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Header */
+#header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 20;
+  text-align: center;
+  padding: 12px 16px 8px;
+  pointer-events: none;
+}
+
+#header .label {
+  font-size: 0.65em;
+  letter-spacing: 0.2em;
+  color: var(--grey);
+  text-transform: uppercase;
+}
+
+#header h1 {
+  font-size: 1.3em;
+  font-weight: 900;
+  margin: 2px 0;
+  background: linear-gradient(135deg, var(--teal), var(--gold), var(--orange));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+#header .subtitle {
+  font-size: 0.8em;
+  color: var(--grey);
+  font-weight: 400;
+}
+
+/* Score bar */
+#score-bar {
+  position: fixed;
+  top: 80px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  gap: 16px;
+  font-size: 0.75em;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+#score-bar .correct { color: var(--teal); }
+#score-bar .wrong { color: var(--orange); }
+#score-bar .current { color: var(--gold); }
+
+/* Progress bar */
+#progress-bar {
+  position: fixed;
+  top: 72px; left: 16px; right: 16px;
+  height: 3px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+  z-index: 20;
+  overflow: hidden;
+}
+
+#progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--orange), var(--gold), var(--teal));
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+/* Sentence display */
+#situation {
+  position: fixed;
+  top: 108px; left: 16px; right: 16px;
+  z-index: 15;
+  text-align: center;
+  padding: 12px 20px;
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  font-size: 0.85em;
+  line-height: 1.6;
+  pointer-events: none;
+}
+
+#situation .hint {
+  font-size: 0.75em;
+  color: var(--grey);
+  margin-top: 6px;
+  font-style: italic;
+}
+
+/* Zone containers */
+#zones {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 120px;
+  z-index: 2;
+  display: flex;
+  pointer-events: none;
+}
+
+.zone {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-top: 3px solid;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.zone-past {
+  border-color: var(--orange);
+  background: linear-gradient(to top, rgba(249, 115, 22, 0.12), transparent);
+}
+
+.zone-bridge {
+  border-color: var(--gold);
+  background: linear-gradient(to top, rgba(255, 215, 0, 0.12), transparent);
+}
+
+.zone-present {
+  border-color: var(--teal);
+  background: linear-gradient(to top, rgba(8, 145, 178, 0.12), transparent);
+}
+
+.zone-label {
+  font-size: 0.7em;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.zone-past .zone-label { color: var(--orange); }
+.zone-bridge .zone-label { color: var(--gold); }
+.zone-present .zone-label { color: var(--teal); }
+
+.zone-sublabel {
+  font-size: 0.55em;
+  color: var(--grey);
+  margin-top: 2px;
+}
+
+.zone.zone-active {
+  border-top-width: 5px;
+}
+
+.zone-past.zone-active { background: linear-gradient(to top, rgba(249, 115, 22, 0.25), transparent); }
+.zone-bridge.zone-active { background: linear-gradient(to top, rgba(255, 215, 0, 0.25), transparent); }
+.zone-present.zone-active { background: linear-gradient(to top, rgba(8, 145, 178, 0.25), transparent); }
+
+/* Locked fragment display in zone */
+.zone-locked {
+  font-size: 0.75em;
+  font-weight: 700;
+  margin-top: 6px;
+  max-width: 90%;
+  text-align: center;
+  word-wrap: break-word;
+  opacity: 0;
+  transform: translateY(5px);
+  transition: all 0.4s ease;
+}
+
+.zone-locked.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.zone-past .zone-locked { color: var(--orange); }
+.zone-bridge .zone-locked { color: var(--gold); }
+.zone-present .zone-locked { color: var(--teal); }
+
+/* Physics word bodies (DOM elements synced to Matter.js) */
+.word-body {
+  position: absolute;
+  top: 0; left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border-radius: 16px;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.2px;
+  background: var(--card-bg);
+  color: #e2e8f0;
+  border: 2px solid rgba(255,255,255,0.12);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+  cursor: grab;
+  will-change: transform;
+  z-index: 5;
+  white-space: nowrap;
+  text-align: center;
+  transition: border-color 0.3s, box-shadow 0.3s, background 0.3s;
+  pointer-events: none; /* Let canvas handle interaction */
+}
+
+.word-body:active { cursor: grabbing; }
+
+.word-body.locked {
+  cursor: default;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.word-body.correct-flash {
+  animation: correctPulse 0.6s ease;
+}
+
+@keyframes correctPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.word-body.wrong-flash {
+  animation: wrongShake 0.4s ease;
+}
+
+@keyframes wrongShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+
+/* Controls */
+#controls {
+  position: fixed;
+  bottom: 130px; right: 16px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#controls button {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #e2e8f0;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 0.7em;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+#controls button:hover {
+  background: rgba(255,255,255,0.12);
+  transform: translateY(-1px);
+}
+
+#controls button:active {
+  transform: translateY(0);
+}
+
+#controls button.explode-btn {
+  border-color: var(--gold);
+  color: var(--gold);
+  display: none;
+}
+
+#controls button.explode-btn.visible {
+  display: block;
+  animation: goldPulse 2s ease-in-out infinite;
+}
+
+@keyframes goldPulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--gold-glow); }
+  50% { box-shadow: 0 0 20px 4px var(--gold-glow); }
+}
+
+/* Game over overlay */
+#game-over {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(15, 23, 42, 0.95);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+}
+
+#game-over.visible { display: flex; }
+
+#game-over h2 {
+  font-size: 2em;
+  font-weight: 900;
+  background: linear-gradient(135deg, var(--teal), var(--gold), var(--orange));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 12px;
+}
+
+#game-over .final-score {
+  font-size: 1.1em;
+  color: var(--grey);
+  margin-bottom: 24px;
+}
+
+#game-over button {
+  background: linear-gradient(135deg, var(--teal), var(--orange));
+  border: none;
+  color: white;
+  padding: 14px 32px;
+  border-radius: 12px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 1em;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+#game-over button:hover { transform: scale(1.05); }
+
+/* Hidden physics canvas */
+canvas {
+  position: fixed;
+  top: 0; left: 0;
+  opacity: 0;
+  pointer-events: auto;
+  z-index: 4;
+}
+
+/* Feedback toast */
+#feedback {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 30;
+  font-size: 1.4em;
+  font-weight: 900;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+#feedback.visible { opacity: 1; }
+#feedback.correct { color: var(--teal); text-shadow: 0 0 30px var(--teal-glow); }
+#feedback.wrong { color: var(--orange); text-shadow: 0 0 30px var(--orange-glow); }
+
+@media (min-width: 768px) {
+  #header h1 { font-size: 1.6em; }
+  .word-body { font-size: 16px; padding: 10px 22px; }
+  .zone { height: 140px; }
+  #zones { height: 140px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div id="header">
+  <div class="label">CYE Physics · v0.1</div>
+  <h1>Feel the Tense</h1>
+  <div class="subtitle">Sort each sentence onto the timeline</div>
+</div>
+
+<!-- Progress -->
+<div id="progress-bar"><div id="progress-fill"></div></div>
+
+<!-- Score -->
+<div id="score-bar">
+  <span class="correct">✓ <span id="score-correct">0</span></span>
+  <span class="wrong">✗ <span id="score-wrong">0</span></span>
+  <span class="current"><span id="score-current">1</span> / <span id="score-total">10</span></span>
+  <span class="timer" id="timer" style="color: var(--gold); font-variant-numeric: tabular-nums;">⏱ 0:00</span>
+</div>
+
+<!-- Situation card -->
+<div id="situation">
+  <div id="situation-text"></div>
+  <div class="hint">Same verb, three tenses — where does each one live?</div>
+</div>
+
+<!-- Target zones -->
+<div id="zones">
+  <div class="zone zone-past" data-zone="past">
+    <div class="zone-label">Past Simple</div>
+    <div class="zone-sublabel">it happened, it's over</div>
+    <div class="zone-locked" id="locked-past"></div>
+  </div>
+  <div class="zone zone-bridge" data-zone="bridge">
+    <div class="zone-label">Present Perfect</div>
+    <div class="zone-sublabel">it happened, it still matters</div>
+    <div class="zone-locked" id="locked-bridge"></div>
+  </div>
+  <div class="zone zone-present" data-zone="present">
+    <div class="zone-label">Present Simple</div>
+    <div class="zone-sublabel">it happens, it's routine</div>
+    <div class="zone-locked" id="locked-present"></div>
+  </div>
+</div>
+
+<!-- Controls -->
+<div id="controls">
+  <button id="btn-gravity">Zero-G</button>
+  <button id="btn-reset">Reset</button>
+  <button id="btn-explode" class="explode-btn">Explode!</button>
+</div>
+
+<!-- Feedback toast -->
+<div id="feedback"></div>
+
+<!-- Game over -->
+<div id="game-over">
+  <h2>Well Done!</h2>
+  <div class="final-score" id="final-score"></div>
+  <button id="btn-restart">Play Again</button>
+</div>
+
+<!-- Container for physics word elements -->
+<div id="scene-container" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:3;"></div>
+
+<script>
+// ═══ CYE Physics Engine ═══════════════════════════════
+const { Engine, Render, Runner, Bodies, Body, Composite, Events, Mouse, MouseConstraint } = Matter;
+
+// ═══ Sentences (GEII contextual) ═══════════════════════
+// ═══ Sentences: same situation, three tenses ═══════════
+// Students sort which tense is which — the subtle difference teaches
+const SENTENCES = [
+  { past: "The capacitor failed", bridge: "The capacitor has failed", present: "The capacitor fails" },
+  { past: "We tested the prototype", bridge: "We have tested the prototype", present: "We test the prototype" },
+  { past: "She soldered the components", bridge: "She has soldered the components", present: "She solders the components" },
+  { past: "The voltage dropped", bridge: "The voltage has dropped", present: "The voltage drops" },
+  { past: "They updated the firmware", bridge: "They have updated the firmware", present: "They update the firmware" },
+  { past: "The motor overheated", bridge: "The motor has overheated", present: "The motor overheats" },
+  { past: "I calibrated the sensor", bridge: "I have calibrated the sensor", present: "I calibrate the sensor" },
+  { past: "The PCB design changed", bridge: "The PCB design has changed", present: "The PCB design changes" },
+  { past: "We completed the audit", bridge: "We have completed the audit", present: "We complete the audit" },
+  { past: "She programmed the robot", bridge: "She has programmed the robot", present: "She programmes the robot" },
+];
+
+const ZONE_COLOURS = {
+  past: { colour: "#f97316", glow: "rgba(249,115,22,0.4)" },
+  bridge: { colour: "#ffd700", glow: "rgba(255,215,0,0.4)" },
+  present: { colour: "#0891b2", glow: "rgba(8,145,178,0.4)" },
+};
+
+// ═══ Audio ═══════════════════════════════════════════════
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playCorrectSound() {
+  const ctx = getAudioCtx();
+  const now = ctx.currentTime;
+  // Ascending two-note chime (past rising to present)
+  [330, 660].forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, now + i * 0.15);
+    gain.gain.setValueAtTime(0.15, now + i * 0.15);
+    gain.gain.linearRampToValueAtTime(0, now + i * 0.15 + 0.3);
+    osc.start(now + i * 0.15);
+    osc.stop(now + i * 0.15 + 0.35);
+  });
+}
+
+function playWrongSound() {
+  const ctx = getAudioCtx();
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(180, now);
+  gain.gain.setValueAtTime(0.08, now);
+  gain.gain.linearRampToValueAtTime(0, now + 0.2);
+  osc.start(now);
+  osc.stop(now + 0.25);
+}
+
+function playVictorySound() {
+  const ctx = getAudioCtx();
+  const now = ctx.currentTime;
+  [523, 659, 784, 1047].forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, now + i * 0.15);
+    gain.gain.setValueAtTime(0.12, now + i * 0.15);
+    gain.gain.linearRampToValueAtTime(0, now + i * 0.15 + 0.3);
+    osc.start(now + i * 0.15);
+    osc.stop(now + i * 0.15 + 0.35);
+  });
+}
+
+function playCollisionSound(velocity) {
+  const ctx = getAudioCtx();
+  const intensity = Math.max(0, Math.min(velocity / 12, 1));
+  if (intensity < 0.15) return;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(250 + Math.random() * 150, now);
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(intensity * 0.12, now + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+  osc.start(now);
+  osc.stop(now + 0.1);
+}
+
+function playExplodeSound() {
+  const ctx = getAudioCtx();
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.frequency.setValueAtTime(120, now);
+  osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.5);
+  gain.gain.setValueAtTime(0.4, now);
+  gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+  osc.start(now);
+  osc.stop(now + 0.5);
+}
+
+// ═══ Game State ═══════════════════════════════════════════
+let shuffledSentences = shuffle([...SENTENCES]);
+let currentSentenceIdx = 0;
+let score = { correct: 0, wrong: 0 };
+let lockedZones = {};      // { past: true, bridge: true, present: true }
+let fragmentBodies = [];   // [{ body, elem, zone, text }]
+let gravityOn = true;
+let timerStart = null;
+let timerInterval = null;
+let totalElapsed = 0;
+
+// ═══ Timer ═══════════════════════════════════════════════
+function startTimer() {
+  timerStart = Date.now();
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(updateTimerDisplay, 100);
+}
+
+function stopTimer() {
+  if (timerStart) totalElapsed += Date.now() - timerStart;
+  timerStart = null;
+  if (timerInterval) clearInterval(timerInterval);
+}
+
+function updateTimerDisplay() {
+  const running = timerStart ? Date.now() - timerStart : 0;
+  const total = totalElapsed + running;
+  const secs = Math.floor(total / 1000);
+  const mins = Math.floor(secs / 60);
+  const s = secs % 60;
+  document.getElementById('timer').textContent = `⏱ ${mins}:${s.toString().padStart(2, '0')}`;
+}
+
+function formatTime(ms) {
+  const secs = Math.floor(ms / 1000);
+  const mins = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${mins}:${s.toString().padStart(2, '0')}`;
+}
+
+// ═══ Matter.js Setup ═══════════════════════════════════════
+const engine = Engine.create();
+const world = engine.world;
+engine.gravity.y = 0.8;
+
+const W = window.innerWidth;
+const H = window.innerHeight;
+
+const render = Render.create({
+  element: document.body,
+  engine: engine,
+  options: { width: W, height: H, wireframes: false, background: 'transparent' }
+});
+Render.run(render);
+
+const runner = Runner.create();
+Runner.run(runner, engine);
+
+// ═══ Walls ═══════════════════════════════════════════════
+function createWalls() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const t = 60;
+  const zoneH = w >= 768 ? 140 : 120;
+
+  const existing = Composite.allBodies(world).filter(b => b.label === 'wall');
+  Composite.remove(world, existing);
+
+  const walls = [
+    // Floor (at zone top)
+    Bodies.rectangle(w / 2, h - zoneH + t / 2, w, t, { isStatic: true, label: 'wall', friction: 0.8, restitution: 0.3 }),
+    // Left
+    Bodies.rectangle(-t / 2, h / 2, t, h * 3, { isStatic: true, label: 'wall', friction: 0 }),
+    // Right
+    Bodies.rectangle(w + t / 2, h / 2, t, h * 3, { isStatic: true, label: 'wall', friction: 0 }),
+    // Ceiling (invisible, keeps things from flying too high)
+    Bodies.rectangle(w / 2, -500, w, t, { isStatic: true, label: 'wall' }),
+  ];
+  Composite.add(world, walls);
+}
+createWalls();
+
+// ═══ Collision Sounds ═══════════════════════════════════
+Events.on(engine, 'collisionStart', (event) => {
+  if (event.pairs.length > 6) return;
+  for (const pair of event.pairs) {
+    const speedA = pair.bodyA.velocity ? Math.hypot(pair.bodyA.velocity.x, pair.bodyA.velocity.y) : 0;
+    const speedB = pair.bodyB.velocity ? Math.hypot(pair.bodyB.velocity.x, pair.bodyB.velocity.y) : 0;
+    playCollisionSound(speedA + speedB);
+  }
+});
+
+// ═══ Mouse Constraint ═══════════════════════════════════
+const mouse = Mouse.create(render.canvas);
+const mouseConstraint = MouseConstraint.create(engine, {
+  mouse: mouse,
+  constraint: { stiffness: 0.2, render: { visible: false } }
+});
+Composite.add(world, mouseConstraint);
+render.canvas.style.zIndex = '4';
+
+// ═══ Track drops into zones ═══════════════════════════════
+Events.on(mouseConstraint, 'enddrag', (event) => {
+  const body = event.body;
+  if (!body) return;
+
+  const frag = fragmentBodies.find(f => f.body === body);
+  if (!frag || frag.locked) return;
+
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const zoneH = w >= 768 ? 140 : 120;
+  const y = body.position.y;
+  const x = body.position.x;
+
+  // Check if in zone area (bottom of screen)
+  if (y < h - zoneH - 30) return;
+
+  // Determine which zone
+  let droppedZone = null;
+  if (x < w / 3) droppedZone = 'past';
+  else if (x < (w / 3) * 2) droppedZone = 'bridge';
+  else droppedZone = 'present';
+
+  // Already locked?
+  if (lockedZones[droppedZone]) {
+    // Bounce it back
+    Body.applyForce(body, body.position, { x: 0, y: -0.08 * body.mass });
+    return;
+  }
+
+  // Check correctness
+  if (frag.zone === droppedZone) {
+    // CORRECT!
+    lockFragment(frag, droppedZone);
+    playCorrectSound();
+    showFeedback('✓', 'correct');
+    score.correct++;
+    updateScoreDisplay();
+
+    // Check if all three zones filled
+    if (Object.keys(lockedZones).length === 3) {
+      onSentenceComplete();
+    }
+  } else {
+    // WRONG - bounce back
+    playWrongSound();
+    showFeedback('✗ try again!', 'wrong');
+    score.wrong++;
+    updateScoreDisplay();
+
+    // Push it back toward centre, not off-screen
+    const centreX = w / 2;
+    const pushX = (body.position.x - centreX) * -0.0005 * body.mass;
+    Body.applyForce(body, body.position, { x: pushX, y: -0.06 * body.mass });
+    Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.2);
+
+    frag.elem.classList.add('wrong-flash');
+    setTimeout(() => frag.elem.classList.remove('wrong-flash'), 400);
+  }
+});
+
+// ═══ Lock a fragment in its zone ═══════════════════════════
+function lockFragment(frag, zone) {
+  lockedZones[zone] = true;
+  frag.locked = true;
+
+  // Show the text in the zone
+  const lockedEl = document.getElementById(`locked-${zone}`);
+  lockedEl.textContent = frag.text;
+  lockedEl.classList.add('visible');
+
+  // Light up the zone
+  const zoneEl = document.querySelector(`.zone-${zone}`);
+  zoneEl.classList.add('zone-active');
+
+  // Make physics body static and fade DOM element
+  Body.setStatic(frag.body, true);
+  frag.elem.classList.add('correct-flash');
+  setTimeout(() => {
+    frag.elem.classList.add('locked');
+  }, 500);
+}
+
+// ═══ Sentence Complete ═══════════════════════════════════
+function onSentenceComplete() {
+  stopTimer();
+  // Show explode button
+  document.getElementById('btn-explode').classList.add('visible');
+
+  // Wait a beat then advance
+  setTimeout(() => {
+    document.getElementById('btn-explode').classList.remove('visible');
+    currentSentenceIdx++;
+    if (currentSentenceIdx >= shuffledSentences.length) {
+      endGame();
+    } else {
+      loadSentence();
+    }
+  }, 2500);
+}
+
+// ═══ Feedback Toast ═══════════════════════════════════════
+function showFeedback(text, type) {
+  const fb = document.getElementById('feedback');
+  fb.textContent = text;
+  fb.className = `visible ${type}`;
+  setTimeout(() => fb.className = '', 800);
+}
+
+// ═══ Score Display ═══════════════════════════════════════
+function updateScoreDisplay() {
+  document.getElementById('score-correct').textContent = score.correct;
+  document.getElementById('score-wrong').textContent = score.wrong;
+  document.getElementById('score-current').textContent = currentSentenceIdx + 1;
+  document.getElementById('progress-fill').style.width = `${((currentSentenceIdx) / shuffledSentences.length) * 100}%`;
+}
+
+// ═══ Spawn Fragments ═══════════════════════════════════════
+function spawnFragments(sentence) {
+  const container = document.getElementById('scene-container');
+  const w = window.innerWidth;
+  const fragments = shuffle([
+    { text: sentence.past, zone: 'past' },
+    { text: sentence.bridge, zone: 'bridge' },
+    { text: sentence.present, zone: 'present' },
+  ]);
+
+  fragments.forEach((frag, i) => {
+    const margin = 60;
+    const usableW = w - margin * 2;
+    const x = margin + (usableW / 4) + (i * usableW / 4);
+    const y = -80 - (i * 100); // Staggered from top, all above screen but below ceiling
+
+    // Measure text width — sentences are longer now
+    const charW = 8;
+    const pad = 36;
+    const maxW = Math.min(w * 0.85, 380);
+    const boxW = Math.min(frag.text.length * charW + pad, maxW);
+    const boxH = 42;
+
+    // Physics body
+    const body = Bodies.rectangle(x, y, boxW, boxH, {
+      angle: (Math.random() - 0.5) * 0.4,
+      restitution: 0.5,
+      friction: 0.1,
+      frictionAir: 0.02,
+      label: frag.zone,
+    });
+
+    // DOM element
+    const elem = document.createElement('div');
+    elem.classList.add('word-body');
+    elem.textContent = frag.text;
+    elem.style.width = `${boxW}px`;
+    elem.style.height = `${boxH}px`;
+    container.appendChild(elem);
+
+    const fragData = { body, elem, zone: frag.zone, text: frag.text, locked: false };
+    fragmentBodies.push(fragData);
+    Composite.add(world, body);
+  });
+}
+
+// ═══ Clear Fragments ═══════════════════════════════════════
+function clearFragments() {
+  const container = document.getElementById('scene-container');
+  fragmentBodies.forEach(f => {
+    Composite.remove(world, f.body);
+    if (f.elem.parentNode) f.elem.parentNode.removeChild(f.elem);
+  });
+  fragmentBodies = [];
+  lockedZones = {};
+
+  // Reset zones
+  document.querySelectorAll('.zone').forEach(z => z.classList.remove('zone-active'));
+  document.querySelectorAll('.zone-locked').forEach(el => {
+    el.textContent = '';
+    el.classList.remove('visible');
+  });
+}
+
+// ═══ Load Sentence ═══════════════════════════════════════
+function loadSentence() {
+  clearFragments();
+  const sentence = shuffledSentences[currentSentenceIdx];
+
+  // Build situation text (plain white, no colours yet)
+  const situationEl = document.getElementById('situation-text');
+  situationEl.innerHTML = `<strong>${sentence.past}</strong> + <em style="color:var(--gold)">${sentence.bridge}</em> → <strong>${sentence.present}</strong>`;
+
+  // Actually show it as the jumbled version
+  situationEl.innerHTML = `Which tense is which? Drag each sentence to its timeline.`;
+
+  updateScoreDisplay();
+  document.getElementById('score-total').textContent = shuffledSentences.length;
+
+  // Spawn after a tiny delay for visual breathing room
+  setTimeout(() => {
+    spawnFragments(sentence);
+    startTimer();
+  }, 300);
+}
+
+// ═══ End Game ═══════════════════════════════════════════
+function endGame() {
+  stopTimer();
+  updateTimerDisplay();
+  clearFragments();
+  playVictorySound();
+  const overlay = document.getElementById('game-over');
+  overlay.classList.add('visible');
+  document.getElementById('final-score').textContent =
+    `${score.correct} correct · ${score.wrong} mistakes · ${shuffledSentences.length} sentences · ${formatTime(totalElapsed)}`;
+}
+
+// ═══ Sync Loop ═══════════════════════════════════════════
+function updateLoop() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  fragmentBodies.forEach(f => {
+    if (f.locked) return;
+    const { position, angle } = f.body;
+
+    // Rescue pills that escape bounds
+    if (position.x < -100 || position.x > w + 100 || position.y > h + 100) {
+      Body.setPosition(f.body, { x: w / 2 + (Math.random() - 0.5) * 100, y: 50 });
+      Body.setVelocity(f.body, { x: 0, y: 0 });
+    }
+
+    f.elem.style.transform = `translate(${position.x - f.elem.offsetWidth / 2}px, ${position.y - f.elem.offsetHeight / 2}px) rotate(${angle}rad)`;
+  });
+  requestAnimationFrame(updateLoop);
+}
+updateLoop();
+
+// ═══ Controls ═══════════════════════════════════════════
+document.getElementById('btn-gravity').addEventListener('click', () => {
+  gravityOn = !gravityOn;
+  engine.gravity.y = gravityOn ? 0.8 : 0;
+  document.getElementById('btn-gravity').textContent = gravityOn ? 'Zero-G' : 'Gravity';
+  if (!gravityOn) {
+    fragmentBodies.forEach(f => {
+      if (!f.locked) {
+        Body.applyForce(f.body, f.body.position, {
+          x: (Math.random() - 0.5) * 0.004,
+          y: (Math.random() - 0.5) * 0.004,
+        });
+      }
+    });
+  }
+});
+
+document.getElementById('btn-explode').addEventListener('click', () => {
+  playExplodeSound();
+  fragmentBodies.forEach(f => {
+    if (f.locked) {
+      Body.setStatic(f.body, false);
+      f.locked = false;
+      f.elem.classList.remove('locked');
+      f.elem.style.opacity = '1';
+    }
+    const force = 0.06 * f.body.mass;
+    const angle = Math.random() * Math.PI * 2;
+    Body.applyForce(f.body, f.body.position, {
+      x: Math.cos(angle) * force,
+      y: Math.sin(angle) * force,
+    });
+  });
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  // Reload current sentence - fresh drop
+  loadSentence();
+});
+
+document.getElementById('btn-restart').addEventListener('click', () => {
+  document.getElementById('game-over').classList.remove('visible');
+  shuffledSentences = shuffle([...SENTENCES]);
+  currentSentenceIdx = 0;
+  score = { correct: 0, wrong: 0 };
+  totalElapsed = 0;
+  timerStart = null;
+  document.getElementById('timer').textContent = '⏱ 0:00';
+  loadSentence();
+});
+
+// ═══ Resize ═══════════════════════════════════════════════
+window.addEventListener('resize', () => {
+  render.canvas.width = window.innerWidth;
+  render.canvas.height = window.innerHeight;
+  createWalls();
+});
+
+// ═══ Utility ═══════════════════════════════════════════════
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ═══ Start! ═══════════════════════════════════════════════
+loadSentence();
+</script>
+</body>
+</html>
