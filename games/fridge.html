@@ -698,6 +698,9 @@
     document.getElementById('feedback').innerHTML = '&nbsp;';
     document.getElementById('feedback').className = 'feedback';
 
+    // Speak the word aloud
+    speakWord(word.word);
+
     // Update gauges
     document.getElementById('gaugeCountable').style.width = `${(countablePlaced / 7) * 100}%`;
     document.getElementById('gaugeUncountable').style.width = `${(uncountablePlaced / 7) * 100}%`;
@@ -721,6 +724,7 @@
     if (guess === word.category) {
       // CORRECT
       streak++;
+      playTone('correct');
       magnet.classList.add('correct');
       feedback.textContent = streak > 2 ? `✓ ${streak} in a row!` : '✓';
       feedback.className = 'feedback correct';
@@ -740,6 +744,7 @@
       // WRONG
       streak = 0;
       errors++;
+      playTone('wrong');
       magnet.classList.add('shake');
       feedback.textContent = word.hint;
       feedback.className = 'feedback wrong';
@@ -773,6 +778,7 @@
   }
 
   function showCelebration() {
+    playTone('victory');
     const accuracy = Math.round((shuffledWords.length / totalAttempts) * 100);
     const stats = document.getElementById('celebrationStats');
     
@@ -805,6 +811,56 @@
     
     startGame();
   }
+
+  // ── CYE Audio System ─────────────────────────────────────
+  function speakWord(word) {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(word);
+    u.lang = 'en-GB';
+    u.rate = 0.9;
+    u.pitch = 1.0;
+    window.speechSynthesis.speak(u);
+  }
+
+  function playTone(type) {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      if (type === 'correct') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(330, ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(660, ctx.currentTime + 0.25);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.3);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.3);
+      } else if (type === 'wrong') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(180, ctx.currentTime);
+        gain.gain.setValueAtTime(0.07, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.2);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.2);
+      } else if (type === 'victory') {
+        [523, 659, 784, 1047].forEach((freq, i) => {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.connect(g); g.connect(ctx.destination);
+          o.type = 'sine';
+          o.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.13);
+          g.gain.setValueAtTime(0.1, ctx.currentTime + i * 0.13);
+          g.gain.linearRampToValueAtTime(0, ctx.currentTime + i * 0.13 + 0.25);
+          o.start(ctx.currentTime + i * 0.13);
+          o.stop(ctx.currentTime + i * 0.13 + 0.25);
+        });
+      }
+    } catch(e) {}
+  }
+  // ─────────────────────────────────────────────────────────
 
   // Keyboard support for desktop
   document.addEventListener('keydown', (e) => {
