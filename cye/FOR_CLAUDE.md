@@ -54,9 +54,9 @@ Build Core first. Validate with students. Then Ring 1.
 - `CYE_Project_Bible_v02.docx` — Primary reference. Read this.
   Updated March 2026: ideasthesia frame in sections 1.1 and 3.2.
 - `CYE_Project_Specification_v0_1.docx` — Original spec. Concentric circles model.
-- in CYE/literature reviews/ folder: 
-  - [ideasthesia_literature_review.pdf](https://github.com/colibrissimo/colibrissimo.github.io/blob/main/cye/literature%20reviews/ideasthesia_literature_review.pdf)
-  - [dyslexia_esl_literature_review.pdf](https://github.com/colibrissimo/colibrissimo.github.io/blob/main/cye/literature%20reviews/dyslexia_esl_literature_review.pdf)
+- in CYE/literature_reviews/ folder: 
+  - [ideasthesia_literature_review.pdf]
+  - [dyslexia_esl_literature_review.pdf]
 
 ---
 
