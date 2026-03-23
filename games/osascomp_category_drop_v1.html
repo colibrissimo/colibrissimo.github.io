@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>CYE · OSASCOMP · Category Drop</title>
+<title>CYE · OSASCOMP · Category Drop v2</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
 <style>
@@ -78,11 +78,11 @@ body::before {
   border-radius: 2px; transition: width 0.5s ease;
 }
 
-/* Clue card */
+/* Adjective display */
 #clue-card {
   position: fixed; top: 100px; left: 50%; transform: translateX(-50%);
-  z-index: 15; width: calc(100% - 32px); max-width: 460px;
-  padding: 14px 20px;
+  z-index: 15; width: calc(100% - 32px); max-width: 500px;
+  padding: 20px 28px;
   background: rgba(30,41,59,0.88);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 14px;
@@ -91,15 +91,11 @@ body::before {
   pointer-events: none;
 }
 #clue-letter {
-  font-size: 1.5em; font-weight: 900; letter-spacing: 0.12em;
-  color: var(--teal); margin-bottom: 4px;
+  font-size: 2.4em; font-weight: 900;
+  color: #e2e8f0; letter-spacing: 0.04em;
 }
-#clue-meaning {
-  font-size: 0.85em; color: #e2e8f0; font-weight: 700; margin-bottom: 4px;
-}
-#clue-examples {
-  font-size: 0.72em; color: var(--grey); font-style: italic;
-}
+#clue-meaning { display: none; }
+#clue-examples { display: none; }
 
 /* Drop zone */
 #zones {
@@ -136,8 +132,8 @@ body::before {
 .word-body {
   position: absolute; top: 0; left: 0;
   display: flex; align-items: center; justify-content: center;
-  padding: 10px 20px; border-radius: 16px;
-  font-weight: 800; font-size: 15px;
+  padding: 8px 14px; border-radius: 14px;
+  font-weight: 800; font-size: 13px;
   background: var(--card-bg); color: #e2e8f0;
   border: 2px solid rgba(255,255,255,0.12);
   box-shadow: 0 4px 15px rgba(0,0,0,0.4);
@@ -235,9 +231,9 @@ canvas {
 <body>
 
 <div id="header">
-  <div class="label">CYE · OSASCOMP</div>
+  <div class="label">CYE · OSASCOMP · No Hints</div>
   <h1>Category Drop</h1>
-  <div class="subtitle">Drag the right category into the zone</div>
+  <div class="subtitle">Which category is it? Drag the right one into the zone</div>
 </div>
 
 <div id="progress-bar"><div id="progress-fill"></div></div>
@@ -245,7 +241,7 @@ canvas {
 <div id="score-bar">
   <span class="correct">✓ <span id="score-correct">0</span></span>
   <span class="wrong">✗ <span id="score-wrong">0</span></span>
-  <span class="current"><span id="score-current">1</span> / <span id="score-total">8</span></span>
+  <span class="current"><span id="score-current">1</span> / <span id="score-total">18</span></span>
   <span class="current" id="timer" style="color:var(--gold)">⏱ 0:00</span>
 </div>
 
@@ -283,15 +279,27 @@ canvas {
 const { Engine, Render, Runner, Bodies, Body, Composite, Events, Mouse, MouseConstraint } = Matter;
 
 // ═══ Data ═══════════════════════════════════════════════════
+const ALL_CATEGORIES = ['Opinion','Size','Age','Shape','Colour','Origin','Material','Purpose'];
+
 const ROUNDS = [
-  { letter: 'O________', meaning: 'What you think',    examples: 'beautiful, boring, revolutionary, sleek',          answer: 'Opinion',  distractors: ['Shape', 'Age'] },
-  { letter: 'S________', meaning: 'How big/small',     examples: 'small, huge, tiny, lightweight',                   answer: 'Size',     distractors: ['Shape', 'Opinion'] },
-  { letter: 'A________', meaning: 'How old/new',       examples: 'modern, old-fashioned, ancient, new',              answer: 'Age',      distractors: ['Opinion', 'Material'] },
-  { letter: 'S________', meaning: 'What shape',        examples: 'rectangular, circular, square, round',             answer: 'Shape',    distractors: ['Size', 'Colour'] },
-  { letter: 'C________', meaning: 'What colour',       examples: 'grey, transparent, colourful, black',              answer: 'Colour',   distractors: ['Material', 'Shape'] },
-  { letter: 'O________', meaning: 'Where from',        examples: 'Japanese, Scandinavian, Chinese, British',         answer: 'Origin',   distractors: ['Material', 'Purpose'] },
-  { letter: 'M________', meaning: 'What it\'s made of',examples: 'glass, carbon-fibre, plastic, organic',            answer: 'Material', distractors: ['Origin', 'Purpose'] },
-  { letter: 'P________', meaning: 'What it\'s for',    examples: 'shopping (centre), contact (lenses), touch-sensitive', answer: 'Purpose', distractors: ['Material', 'Origin'] },
+  { adjective: 'beautiful',          answer: 'Opinion' },
+  { adjective: 'sleek',              answer: 'Opinion' },
+  { adjective: 'clumsy',             answer: 'Opinion' },
+  { adjective: 'tiny',               answer: 'Size' },
+  { adjective: 'lightweight',        answer: 'Size' },
+  { adjective: 'huge',               answer: 'Size' },
+  { adjective: 'modern',             answer: 'Age' },
+  { adjective: 'old-fashioned',      answer: 'Age' },
+  { adjective: 'rectangular',        answer: 'Shape' },
+  { adjective: 'circular',           answer: 'Shape' },
+  { adjective: 'grey',               answer: 'Colour' },
+  { adjective: 'transparent',        answer: 'Colour' },
+  { adjective: 'Japanese',           answer: 'Origin' },
+  { adjective: 'Scandinavian-designed', answer: 'Origin' },
+  { adjective: 'carbon-fibre',       answer: 'Material' },
+  { adjective: 'organic',            answer: 'Material' },
+  { adjective: 'wireless',           answer: 'Purpose' },
+  { adjective: 'touch-sensitive',    answer: 'Purpose' },
 ];
 
 // ═══ Audio ═══════════════════════════════════════════════════
@@ -452,19 +460,20 @@ function lockAnswer(frag) {
 function spawnPills(round) {
   const container = document.getElementById('scene-container');
   const w = window.innerWidth;
-  const pills = shuffle([
-    { text: round.answer, isAnswer: true },
-    { text: round.distractors[0], isAnswer: false },
-    { text: round.distractors[1], isAnswer: false },
-  ]);
+  const pills = shuffle(ALL_CATEGORIES.map(cat => ({
+    text: cat, isAnswer: cat === round.answer,
+  })));
 
   pills.forEach((pill, i) => {
-    const margin = 60;
+    const cols = 4;
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const margin = 50;
     const usableW = w - margin * 2;
-    const x = margin + usableW / 4 + (i * usableW / 4);
-    const y = -80 - i * 110;
-    const boxW = Math.max(pill.text.length * 11 + 40, 100);
-    const boxH = 46;
+    const x = margin + (usableW / (cols * 2)) + col * (usableW / cols) + (Math.random() - 0.5) * 20;
+    const y = -50 - row * 100 - Math.random() * 30;
+    const boxW = Math.max(pill.text.length * 10 + 32, 88);
+    const boxH = 38;
 
     const body = Bodies.rectangle(x, y, boxW, boxH, {
       angle: (Math.random() - 0.5) * 0.3,
@@ -478,8 +487,7 @@ function spawnPills(round) {
     elem.style.height = `${boxH}px`;
     container.appendChild(elem);
 
-    const fragData = { body, elem, text: pill.text, isAnswer: pill.isAnswer, locked: false };
-    fragmentBodies.push(fragData);
+    fragmentBodies.push({ body, elem, text: pill.text, isAnswer: pill.isAnswer, locked: false });
     Composite.add(world, body);
   });
 }
@@ -502,9 +510,9 @@ function clearFragments() {
 function loadRound() {
   clearFragments();
   const round = shuffledRounds[currentIdx];
-  document.getElementById('clue-letter').textContent = round.letter;
-  document.getElementById('clue-meaning').textContent = round.meaning;
-  document.getElementById('clue-examples').textContent = round.examples;
+  document.getElementById('clue-letter').textContent = round.adjective;
+  document.getElementById('clue-meaning').textContent = '';
+  document.getElementById('clue-examples').textContent = '';
   updateDisplay();
   setTimeout(() => { spawnPills(round); startTimer(); }, 300);
 }
