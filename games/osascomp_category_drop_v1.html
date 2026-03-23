@@ -339,7 +339,8 @@ function playExplode() {
 }
 
 // ═══ State ═══════════════════════════════════════════════════
-let shuffledRounds, currentIdx, score, fragmentBodies, lockedZone;
+let shuffledRounds, currentIdx, score;
+let fragmentBodies = [], lockedZone = false;
 let gravityOn = true, timerStart = null, timerInterval = null, totalElapsed = 0;
 
 function shuffle(arr) {
@@ -367,7 +368,8 @@ Runner.run(Runner.create(), engine);
 function createWalls() {
   const w = window.innerWidth, h = window.innerHeight;
   const t = 60, zoneH = w >= 768 ? 130 : 110;
-  Composite.remove(world, Composite.allBodies(world).filter(b => b.label === 'wall'));
+  const existing = Composite.allBodies(world).filter(b => b.label === 'wall');
+  existing.forEach(b => Composite.remove(world, b));
   Composite.add(world, [
     Bodies.rectangle(w / 2, h - zoneH + t / 2, w, t, { isStatic: true, label: 'wall', friction: 0.8, restitution: 0.3 }),
     Bodies.rectangle(-t / 2, h / 2, t, h * 3, { isStatic: true, label: 'wall', friction: 0 }),
@@ -379,17 +381,16 @@ createWalls();
 
 Events.on(engine, 'collisionStart', (event) => {
   for (const pair of event.pairs) {
-    const v = Math.hypot(
-      (pair.bodyA.velocity?.x || 0) + (pair.bodyB.velocity?.x || 0),
-      (pair.bodyA.velocity?.y || 0) + (pair.bodyB.velocity?.y || 0)
-    );
-    playCollision(v);
+    const vA = pair.bodyA.velocity || { x: 0, y: 0 };
+    const vB = pair.bodyB.velocity || { x: 0, y: 0 };
+    playCollision(Math.hypot(vA.x + vB.x, vA.y + vB.y));
   }
 });
 
 const mouse = Mouse.create(render.canvas);
 const mc = MouseConstraint.create(engine, { mouse, constraint: { stiffness: 0.2, render: { visible: false } } });
 Composite.add(world, mc);
+render.canvas.style.zIndex = '4';
 
 // ═══ Drop detection ═══════════════════════════════════════════
 Events.on(mc, 'enddrag', (event) => {
@@ -610,12 +611,20 @@ window.addEventListener('resize', () => {
 });
 
 // ═══ Start! ══════════════════════════════════════════════════
-shuffledRounds = shuffle([...ROUNDS]);
-currentIdx = 0;
-score = { correct: 0, wrong: 0 };
-fragmentBodies = [];
-lockedZone = false;
-loadRound();
+try {
+  shuffledRounds = shuffle([...ROUNDS]);
+  currentIdx = 0;
+  score = { correct: 0, wrong: 0 };
+  fragmentBodies = [];
+  lockedZone = false;
+  loadRound();
+} catch(e) {
+  document.getElementById('clue-letter').textContent = 'Error';
+  document.getElementById('clue-meaning').style.color = '#f97316';
+  document.getElementById('clue-meaning').textContent = e.message || String(e);
+  document.getElementById('clue-examples').textContent = 'Check browser console for details';
+  console.error('Category Drop init error:', e);
+}
 </script>
 </body>
 </html>
