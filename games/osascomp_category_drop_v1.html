@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>CYE · OSASCOMP · Category Drop</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
+<style>
+:root {
+  --teal: #0891b2;
+  --teal-glow: rgba(8,145,178,0.3);
+  --orange: #f97316;
+  --orange-glow: rgba(249,115,22,0.3);
+  --gold: #ffd700;
+  --gold-glow: rgba(255,215,0,0.3);
+  --dark: #0f172a;
+  --card-bg: #1e293b;
+  --grey: #94a3b8;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: var(--dark);
+  font-family: 'Nunito', sans-serif;
+  color: #e2e8f0;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse at 15% 20%, var(--teal-glow) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 80%, var(--orange-glow) 0%, transparent 50%);
+  pointer-events: none; z-index: 0;
+}
+
+/* Header */
+#header {
+  position: fixed; top: 0; left: 0; right: 0;
+  z-index: 20; text-align: center;
+  padding: 10px 16px 6px;
+  pointer-events: none;
+}
+#header .label { font-size: 0.62em; letter-spacing: 0.2em; color: var(--grey); text-transform: uppercase; }
+#header h1 {
+  font-size: 1.3em; font-weight: 900; margin: 2px 0;
+  background: linear-gradient(135deg, var(--teal), var(--gold), var(--orange));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+#header .subtitle { font-size: 0.78em; color: var(--grey); }
+
+/* Score bar */
+#score-bar {
+  position: fixed; top: 78px; left: 50%; transform: translateX(-50%);
+  z-index: 20; display: flex; gap: 18px;
+  font-size: 0.75em; font-weight: 700; pointer-events: none;
+}
+#score-bar .correct { color: var(--teal); }
+#score-bar .wrong   { color: var(--orange); }
+#score-bar .current { color: var(--gold); font-variant-numeric: tabular-nums; }
+
+/* Progress bar */
+#progress-bar {
+  position: fixed; top: 70px; left: 16px; right: 16px;
+  height: 3px; background: rgba(255,255,255,0.08);
+  border-radius: 2px; z-index: 20; overflow: hidden;
+}
+#progress-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--orange), var(--gold), var(--teal));
+  border-radius: 2px; transition: width 0.5s ease;
+}
+
+/* Clue card */
+#clue-card {
+  position: fixed; top: 100px; left: 50%; transform: translateX(-50%);
+  z-index: 15; width: calc(100% - 32px); max-width: 460px;
+  padding: 14px 20px;
+  background: rgba(30,41,59,0.88);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  backdrop-filter: blur(8px);
+  text-align: center;
+  pointer-events: none;
+}
+#clue-letter {
+  font-size: 1.5em; font-weight: 900; letter-spacing: 0.12em;
+  color: var(--teal); margin-bottom: 4px;
+}
+#clue-meaning {
+  font-size: 0.85em; color: #e2e8f0; font-weight: 700; margin-bottom: 4px;
+}
+#clue-examples {
+  font-size: 0.72em; color: var(--grey); font-style: italic;
+}
+
+/* Drop zone */
+#zones {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: 110px; z-index: 2;
+  display: flex; align-items: stretch;
+  pointer-events: none;
+}
+.zone {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  border-top: 3px solid var(--teal);
+  background: linear-gradient(to top, rgba(8,145,178,0.12), transparent);
+  transition: all 0.3s ease;
+}
+.zone.zone-active {
+  border-top-width: 5px;
+  background: linear-gradient(to top, rgba(8,145,178,0.3), transparent);
+}
+.zone-label {
+  font-size: 0.7em; font-weight: 800;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--teal); opacity: 0.8;
+}
+.zone-sublabel { font-size: 0.55em; color: var(--grey); margin-top: 2px; }
+.zone-locked {
+  font-size: 1em; font-weight: 900; color: var(--teal);
+  margin-top: 6px; opacity: 0;
+  transform: translateY(5px); transition: all 0.4s ease;
+}
+.zone-locked.visible { opacity: 1; transform: translateY(0); }
+
+/* Physics word bodies */
+.word-body {
+  position: absolute; top: 0; left: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 10px 20px; border-radius: 16px;
+  font-weight: 800; font-size: 15px;
+  background: var(--card-bg); color: #e2e8f0;
+  border: 2px solid rgba(255,255,255,0.12);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+  cursor: grab; will-change: transform; z-index: 5;
+  white-space: nowrap; text-align: center;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  pointer-events: none;
+}
+.word-body.locked { cursor: default; opacity: 0; transition: opacity 0.5s ease; }
+.word-body.correct-flash { animation: correctPulse 0.6s ease; }
+@keyframes correctPulse {
+  0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); }
+}
+.word-body.wrong-flash { animation: wrongShake 0.4s ease; }
+@keyframes wrongShake {
+  0%,100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); } 40% { transform: translateX(8px); }
+  60% { transform: translateX(-6px); } 80% { transform: translateX(6px); }
+}
+
+/* Controls */
+#controls {
+  position: fixed; bottom: 120px; right: 16px;
+  z-index: 20; display: flex; flex-direction: column; gap: 8px;
+}
+#controls button {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #e2e8f0; padding: 8px 14px; border-radius: 10px;
+  font-family: 'Nunito', sans-serif; font-weight: 700;
+  font-size: 0.7em; cursor: pointer;
+  backdrop-filter: blur(8px); transition: all 0.2s ease;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+#controls button:hover { background: rgba(255,255,255,0.12); transform: translateY(-1px); }
+#btn-explode { border-color: var(--gold) !important; color: var(--gold) !important; display: none; }
+#btn-explode.visible {
+  display: block;
+  animation: goldPulse 2s ease-in-out infinite;
+}
+@keyframes goldPulse {
+  0%,100% { box-shadow: 0 0 0 0 var(--gold-glow); }
+  50% { box-shadow: 0 0 20px 4px var(--gold-glow); }
+}
+
+/* Feedback toast */
+#feedback {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 30; font-size: 1.5em; font-weight: 900;
+  pointer-events: none; opacity: 0; transition: opacity 0.3s;
+}
+#feedback.visible { opacity: 1; }
+#feedback.correct { color: var(--teal); text-shadow: 0 0 30px var(--teal-glow); }
+#feedback.wrong   { color: var(--orange); text-shadow: 0 0 30px var(--orange-glow); }
+
+/* Game over overlay */
+#game-over {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(15,23,42,0.95);
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+  backdrop-filter: blur(10px); text-align: center; padding: 30px;
+}
+#game-over.visible { display: flex; }
+#game-over h2 {
+  font-size: 2em; font-weight: 900; margin-bottom: 10px;
+  background: linear-gradient(135deg, var(--teal), var(--gold), var(--orange));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+#game-over .summary {
+  color: var(--grey); font-size: 0.9em; line-height: 1.8; margin-bottom: 24px;
+}
+#game-over .summary strong { color: #e2e8f0; }
+#game-over button {
+  background: linear-gradient(135deg, var(--teal), var(--orange));
+  border: none; color: white; padding: 14px 32px; border-radius: 12px;
+  font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1em;
+  cursor: pointer; transition: transform 0.2s;
+}
+#game-over button:hover { transform: scale(1.05); }
+
+canvas {
+  position: fixed; top: 0; left: 0;
+  opacity: 0; pointer-events: auto; z-index: 4;
+}
+
+@media (min-width: 768px) {
+  #header h1 { font-size: 1.6em; }
+  .word-body { font-size: 17px; padding: 12px 24px; }
+  #zones { height: 130px; }
+}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div class="label">CYE · OSASCOMP</div>
+  <h1>Category Drop</h1>
+  <div class="subtitle">Drag the right category into the zone</div>
+</div>
+
+<div id="progress-bar"><div id="progress-fill"></div></div>
+
+<div id="score-bar">
+  <span class="correct">✓ <span id="score-correct">0</span></span>
+  <span class="wrong">✗ <span id="score-wrong">0</span></span>
+  <span class="current"><span id="score-current">1</span> / <span id="score-total">8</span></span>
+  <span class="current" id="timer" style="color:var(--gold)">⏱ 0:00</span>
+</div>
+
+<div id="clue-card">
+  <div id="clue-letter"></div>
+  <div id="clue-meaning"></div>
+  <div id="clue-examples"></div>
+</div>
+
+<div id="zones">
+  <div class="zone" id="drop-zone">
+    <div class="zone-label">Drop here</div>
+    <div class="zone-sublabel">drag the correct category</div>
+    <div class="zone-locked" id="locked-answer"></div>
+  </div>
+</div>
+
+<div id="controls">
+  <button id="btn-gravity">Zero-G</button>
+  <button id="btn-reset">Reset</button>
+  <button id="btn-explode">Explode!</button>
+</div>
+
+<div id="feedback"></div>
+
+<div id="game-over">
+  <h2>OSASCOMP Complete! 🎉</h2>
+  <div class="summary" id="go-summary"></div>
+  <button id="btn-restart">Play Again</button>
+</div>
+
+<div id="scene-container" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:3;"></div>
+
+<script>
+const { Engine, Render, Runner, Bodies, Body, Composite, Events, Mouse, MouseConstraint } = Matter;
+
+// ═══ Data ═══════════════════════════════════════════════════
+const ROUNDS = [
+  { letter: 'O________', meaning: 'What you think',    examples: 'beautiful, boring, revolutionary, sleek',          answer: 'Opinion',  distractors: ['Shape', 'Age'] },
+  { letter: 'S________', meaning: 'How big/small',     examples: 'small, huge, tiny, lightweight',                   answer: 'Size',     distractors: ['Shape', 'Opinion'] },
+  { letter: 'A________', meaning: 'How old/new',       examples: 'modern, old-fashioned, ancient, new',              answer: 'Age',      distractors: ['Opinion', 'Material'] },
+  { letter: 'S________', meaning: 'What shape',        examples: 'rectangular, circular, square, round',             answer: 'Shape',    distractors: ['Size', 'Colour'] },
+  { letter: 'C________', meaning: 'What colour',       examples: 'grey, transparent, colourful, black',              answer: 'Colour',   distractors: ['Material', 'Shape'] },
+  { letter: 'O________', meaning: 'Where from',        examples: 'Japanese, Scandinavian, Chinese, British',         answer: 'Origin',   distractors: ['Material', 'Purpose'] },
+  { letter: 'M________', meaning: 'What it\'s made of',examples: 'glass, carbon-fibre, plastic, organic',            answer: 'Material', distractors: ['Origin', 'Purpose'] },
+  { letter: 'P________', meaning: 'What it\'s for',    examples: 'shopping (centre), contact (lenses), touch-sensitive', answer: 'Purpose', distractors: ['Material', 'Origin'] },
+];
+
+// ═══ Audio ═══════════════════════════════════════════════════
+let audioCtx = null;
+function getCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function beep(freq, type, vol, dur, start) {
+  const ctx = getCtx();
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.connect(g); g.connect(ctx.destination);
+  o.type = type; o.frequency.setValueAtTime(freq, start);
+  g.gain.setValueAtTime(vol, start);
+  g.gain.linearRampToValueAtTime(0, start + dur);
+  o.start(start); o.stop(start + dur + 0.01);
+}
+function playCorrect() {
+  const t = getCtx().currentTime;
+  beep(440, 'sine', 0.15, 0.25, t); beep(660, 'sine', 0.15, 0.25, t + 0.15);
+}
+function playWrong() {
+  const t = getCtx().currentTime;
+  beep(180, 'square', 0.08, 0.2, t);
+}
+function playCollision(v) {
+  if (v < 2) return;
+  const t = getCtx().currentTime;
+  beep(200 + Math.random() * 100, 'sine', Math.min(v / 12, 1) * 0.1, 0.07, t);
+}
+function playWin() {
+  const t = getCtx().currentTime;
+  [523, 659, 784, 1047].forEach((f, i) => beep(f, 'sine', 0.12, 0.3, t + i * 0.15));
+}
+function playExplode() {
+  const ctx = getCtx(), t = ctx.currentTime;
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.connect(g); g.connect(ctx.destination);
+  o.frequency.setValueAtTime(120, t);
+  o.frequency.exponentialRampToValueAtTime(0.01, t + 0.5);
+  g.gain.setValueAtTime(0.35, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+  o.start(t); o.stop(t + 0.5);
+}
+
+// ═══ State ═══════════════════════════════════════════════════
+let shuffledRounds, currentIdx, score, fragmentBodies, lockedZone;
+let gravityOn = true, timerStart = null, timerInterval = null, totalElapsed = 0;
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ═══ Matter.js ═══════════════════════════════════════════════
+const engine = Engine.create();
+const world = engine.world;
+engine.gravity.y = 0.8;
+
+const W = window.innerWidth, H = window.innerHeight;
+const render = Render.create({
+  element: document.body, engine,
+  options: { width: W, height: H, wireframes: false, background: 'transparent' }
+});
+Render.run(render);
+Runner.run(Runner.create(), engine);
+
+function createWalls() {
+  const w = window.innerWidth, h = window.innerHeight;
+  const t = 60, zoneH = w >= 768 ? 130 : 110;
+  Composite.remove(world, Composite.allBodies(world).filter(b => b.label === 'wall'));
+  Composite.add(world, [
+    Bodies.rectangle(w / 2, h - zoneH + t / 2, w, t, { isStatic: true, label: 'wall', friction: 0.8, restitution: 0.3 }),
+    Bodies.rectangle(-t / 2, h / 2, t, h * 3, { isStatic: true, label: 'wall', friction: 0 }),
+    Bodies.rectangle(w + t / 2, h / 2, t, h * 3, { isStatic: true, label: 'wall', friction: 0 }),
+    Bodies.rectangle(w / 2, -500, w, t, { isStatic: true, label: 'wall' }),
+  ]);
+}
+createWalls();
+
+Events.on(engine, 'collisionStart', (event) => {
+  for (const pair of event.pairs) {
+    const v = Math.hypot(
+      (pair.bodyA.velocity?.x || 0) + (pair.bodyB.velocity?.x || 0),
+      (pair.bodyA.velocity?.y || 0) + (pair.bodyB.velocity?.y || 0)
+    );
+    playCollision(v);
+  }
+});
+
+const mouse = Mouse.create(render.canvas);
+const mc = MouseConstraint.create(engine, { mouse, constraint: { stiffness: 0.2, render: { visible: false } } });
+Composite.add(world, mc);
+
+// ═══ Drop detection ═══════════════════════════════════════════
+Events.on(mc, 'enddrag', (event) => {
+  const body = event.body;
+  if (!body) return;
+  const frag = fragmentBodies.find(f => f.body === body);
+  if (!frag || frag.locked) return;
+  if (lockedZone) return;
+
+  const w = window.innerWidth, h = window.innerHeight;
+  const zoneH = w >= 768 ? 130 : 110;
+
+  if (body.position.y < h - zoneH - 20) return;
+
+  if (frag.isAnswer) {
+    lockAnswer(frag);
+    playCorrect();
+    showFeedback('✓', 'correct');
+    score.correct++;
+    updateDisplay();
+    setTimeout(() => {
+      document.getElementById('btn-explode').classList.remove('visible');
+      currentIdx++;
+      if (currentIdx >= shuffledRounds.length) {
+        endGame();
+      } else {
+        loadRound();
+      }
+    }, 2000);
+  } else {
+    playWrong();
+    showFeedback('✗ try again!', 'wrong');
+    score.wrong++;
+    updateDisplay();
+    const cx = w / 2;
+    const pushX = (body.position.x - cx) * -0.0005 * body.mass;
+    Body.applyForce(body, body.position, { x: pushX, y: -0.07 * body.mass });
+    Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.25);
+    frag.elem.classList.add('wrong-flash');
+    setTimeout(() => frag.elem.classList.remove('wrong-flash'), 400);
+  }
+});
+
+// ═══ Lock answer ═══════════════════════════════════════════
+function lockAnswer(frag) {
+  lockedZone = true;
+  frag.locked = true;
+  const lockedEl = document.getElementById('locked-answer');
+  lockedEl.textContent = frag.text;
+  lockedEl.classList.add('visible');
+  document.getElementById('drop-zone').classList.add('zone-active');
+  Body.setStatic(frag.body, true);
+  frag.elem.classList.add('correct-flash');
+  setTimeout(() => frag.elem.classList.add('locked'), 500);
+  document.getElementById('btn-explode').classList.add('visible');
+}
+
+// ═══ Spawn pills ═══════════════════════════════════════════
+function spawnPills(round) {
+  const container = document.getElementById('scene-container');
+  const w = window.innerWidth;
+  const pills = shuffle([
+    { text: round.answer, isAnswer: true },
+    { text: round.distractors[0], isAnswer: false },
+    { text: round.distractors[1], isAnswer: false },
+  ]);
+
+  pills.forEach((pill, i) => {
+    const margin = 60;
+    const usableW = w - margin * 2;
+    const x = margin + usableW / 4 + (i * usableW / 4);
+    const y = -80 - i * 110;
+    const boxW = Math.max(pill.text.length * 11 + 40, 100);
+    const boxH = 46;
+
+    const body = Bodies.rectangle(x, y, boxW, boxH, {
+      angle: (Math.random() - 0.5) * 0.3,
+      restitution: 0.5, friction: 0.1, frictionAir: 0.02,
+    });
+
+    const elem = document.createElement('div');
+    elem.classList.add('word-body');
+    elem.textContent = pill.text;
+    elem.style.width = `${boxW}px`;
+    elem.style.height = `${boxH}px`;
+    container.appendChild(elem);
+
+    const fragData = { body, elem, text: pill.text, isAnswer: pill.isAnswer, locked: false };
+    fragmentBodies.push(fragData);
+    Composite.add(world, body);
+  });
+}
+
+// ═══ Clear ═══════════════════════════════════════════════════
+function clearFragments() {
+  const container = document.getElementById('scene-container');
+  fragmentBodies.forEach(f => {
+    Composite.remove(world, f.body);
+    if (f.elem.parentNode) f.elem.parentNode.removeChild(f.elem);
+  });
+  fragmentBodies = [];
+  lockedZone = false;
+  document.getElementById('drop-zone').classList.remove('zone-active');
+  const lockedEl = document.getElementById('locked-answer');
+  lockedEl.textContent = ''; lockedEl.classList.remove('visible');
+}
+
+// ═══ Load round ═══════════════════════════════════════════════
+function loadRound() {
+  clearFragments();
+  const round = shuffledRounds[currentIdx];
+  document.getElementById('clue-letter').textContent = round.letter;
+  document.getElementById('clue-meaning').textContent = round.meaning;
+  document.getElementById('clue-examples').textContent = round.examples;
+  updateDisplay();
+  setTimeout(() => { spawnPills(round); startTimer(); }, 300);
+}
+
+// ═══ Display ═════════════════════════════════════════════════
+function updateDisplay() {
+  document.getElementById('score-correct').textContent = score.correct;
+  document.getElementById('score-wrong').textContent = score.wrong;
+  document.getElementById('score-current').textContent = currentIdx + 1;
+  document.getElementById('progress-fill').style.width = `${(currentIdx / shuffledRounds.length) * 100}%`;
+}
+
+function showFeedback(text, type) {
+  const fb = document.getElementById('feedback');
+  fb.textContent = text; fb.className = `visible ${type}`;
+  setTimeout(() => fb.className = '', 800);
+}
+
+// ═══ Timer ═══════════════════════════════════════════════════
+function startTimer() {
+  timerStart = Date.now();
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    const total = totalElapsed + (Date.now() - timerStart);
+    const s = Math.floor(total / 1000);
+    document.getElementById('timer').textContent = `⏱ ${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
+  }, 200);
+}
+function stopTimer() {
+  if (timerStart) totalElapsed += Date.now() - timerStart;
+  timerStart = null; clearInterval(timerInterval);
+}
+function formatTime(ms) {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
+}
+
+// ═══ End ═════════════════════════════════════════════════════
+function endGame() {
+  stopTimer(); clearFragments(); playWin();
+  document.getElementById('progress-fill').style.width = '100%';
+  document.getElementById('go-summary').innerHTML =
+    `Correct: <strong>${score.correct}</strong> &nbsp;·&nbsp; ` +
+    `Mistakes: <strong>${score.wrong}</strong> &nbsp;·&nbsp; ` +
+    `Time: <strong>${formatTime(totalElapsed)}</strong>`;
+  document.getElementById('game-over').classList.add('visible');
+}
+
+// ═══ Sync loop ═══════════════════════════════════════════════
+function updateLoop() {
+  const w = window.innerWidth, h = window.innerHeight;
+  fragmentBodies.forEach(f => {
+    if (f.locked) return;
+    const { position, angle } = f.body;
+    if (position.x < -100 || position.x > w + 100 || position.y > h + 100) {
+      Body.setPosition(f.body, { x: w / 2 + (Math.random() - 0.5) * 100, y: 50 });
+      Body.setVelocity(f.body, { x: 0, y: 0 });
+    }
+    f.elem.style.transform = `translate(${position.x - f.elem.offsetWidth / 2}px, ${position.y - f.elem.offsetHeight / 2}px) rotate(${angle}rad)`;
+  });
+  requestAnimationFrame(updateLoop);
+}
+updateLoop();
+
+// ═══ Controls ════════════════════════════════════════════════
+document.getElementById('btn-gravity').addEventListener('click', () => {
+  gravityOn = !gravityOn;
+  engine.gravity.y = gravityOn ? 0.8 : 0;
+  document.getElementById('btn-gravity').textContent = gravityOn ? 'Zero-G' : 'Gravity';
+  if (!gravityOn) {
+    fragmentBodies.forEach(f => {
+      if (!f.locked) Body.applyForce(f.body, f.body.position, {
+        x: (Math.random() - 0.5) * 0.004, y: (Math.random() - 0.5) * 0.004,
+      });
+    });
+  }
+});
+
+document.getElementById('btn-explode').addEventListener('click', () => {
+  playExplode();
+  fragmentBodies.forEach(f => {
+    if (f.locked) { Body.setStatic(f.body, false); f.locked = false; f.elem.classList.remove('locked'); f.elem.style.opacity = '1'; }
+    const force = 0.06 * f.body.mass;
+    const a = Math.random() * Math.PI * 2;
+    Body.applyForce(f.body, f.body.position, { x: Math.cos(a) * force, y: Math.sin(a) * force });
+  });
+});
+
+document.getElementById('btn-reset').addEventListener('click', loadRound);
+
+document.getElementById('btn-restart').addEventListener('click', () => {
+  document.getElementById('game-over').classList.remove('visible');
+  shuffledRounds = shuffle([...ROUNDS]);
+  currentIdx = 0; score = { correct: 0, wrong: 0 };
+  totalElapsed = 0; timerStart = null;
+  document.getElementById('timer').textContent = '⏱ 0:00';
+  loadRound();
+});
+
+window.addEventListener('resize', () => {
+  render.canvas.width = window.innerWidth;
+  render.canvas.height = window.innerHeight;
+  createWalls();
+});
+
+// ═══ Start! ══════════════════════════════════════════════════
+shuffledRounds = shuffle([...ROUNDS]);
+currentIdx = 0;
+score = { correct: 0, wrong: 0 };
+fragmentBodies = [];
+lockedZone = false;
+loadRound();
+</script>
+</body>
+</html>
