@@ -507,14 +507,16 @@ function clearFragments() {
 }
 
 // ═══ Load round ═══════════════════════════════════════════════
+let spawnTimeout = null;
 function loadRound() {
+  if (spawnTimeout) { clearTimeout(spawnTimeout); spawnTimeout = null; }
   clearFragments();
   const round = shuffledRounds[currentIdx];
   document.getElementById('clue-letter').textContent = round.adjective;
   document.getElementById('clue-meaning').textContent = '';
   document.getElementById('clue-examples').textContent = '';
   updateDisplay();
-  setTimeout(() => { spawnPills(round); startTimer(); }, 300);
+  spawnTimeout = setTimeout(() => { spawnTimeout = null; spawnPills(round); startTimer(); }, 300);
 }
 
 // ═══ Display ═════════════════════════════════════════════════
