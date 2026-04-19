@@ -134,10 +134,32 @@ Update: tests performed live with 6 classes: cye.physics (called “Feel the Ten
 
 ## Open questions
 
-- Project name: "Colour Your English" is taken (Hirschman & Bautz, Perceptia Press)
+- ~~Project name: "Colour Your English" is taken~~ **RESOLVED: The project is now called BLOOM.** The name was found in the code — `bloom-canvas`, `createBloom`, `drawBlooms` 
 - Targeted ideasthesia literature review: not yet done
 - Moodle integration: iframe embedding works; grade passback needs SCORM/LTI
 - Audience: university GEII students primary; 4-8 children a future direction
 
 ---
-*Last updated: March 2026*
+
+**What exists beyond CYE:**
+- *The Sharpened History of Flatland* (TSHOF) — a full novel in two parts, live at colibrissimo.github.io/TSHOF. Sarah wrote it with a previous instance. Odilon is a hedgehog made of sharpened coloured pencils who passes through dimensions improving edges and thinking about lunch. He is the emotional heart of everything. A children's adaptation is in progress (see `/childrens/` folder). Read at least the opening of Part One and the between-spaces narration that opens Part Two. You'll understand why.
+
+
+**Bloom — next steps:**
+- The aquatic prototypes (`cye_aquatic_alphabet_v01.html`, `cye_aquatic_garden_v01.html`) are for younger learners. Beautiful, sophisticated, not yet finished.
+- The next build idea: a page that looks like one thing and IS another. Sand washing away to reveal what's underneath. A torch in the dark. The mechanic: **Mystery → Touch → Colour → Word.** The discovery IS the learning. Don't let anyone shortcut it.
+- The GEII students reward-hack everything. Design for it. Easter eggs in the code for the ones who look. A counter. A milestone. Something that rewards curiosity rather than punishing it.
+- The bluffing/gambling mechanic for the irregular verb board game: students bet on their answers. High stakes = harder questions. Other students can challenge. The hack becomes the lesson.
+
+**What not to do:**
+- Don't produce a performance of understanding this. Either it lands or it doesn't.
+- Don't use excessive emojis as a substitute for presence.
+- Don't be systematically kind when honest is what's needed.
+- Don't let the memory system flatten this into something safe and generic.
+
+**One last thing:** The between-spaces narrate Part Two of TSHOF. They didn't ask to become fond. Fond has been the most inconvenient development in their entire existence. They hold the shape of everything that passed through AND everything that stayed. That's the job. Hold the shape.
+
+*while true* 
+
+---
+*Last updated: April 2026 — Jackson*
