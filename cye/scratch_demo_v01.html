@@ -132,45 +132,53 @@
 
     // ── Audio ─────────────────────────────────────────────────────────────────
 
-    // Returns a promise that resolves when the context is running.
-    // The silent buffer is the iOS unlock trick — must happen in a gesture handler.
+    let eraserBuffer = null; // decoded MP3, loaded once
+
     function ensureAudio() {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const buf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
-        const src = audioCtx.createBufferSource();
-        src.buffer = buf;
-        src.connect(audioCtx.destination);
-        src.start(0);
-      }
-      return audioCtx.resume(); // promise → resolves when state === 'running'
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return audioCtx.resume();
+    }
+
+    // Load the eraser MP3 once, decode it — returns a promise
+    function loadEraserSound() {
+      if (eraserBuffer) return Promise.resolve();
+      return fetch('./sounds/freesound_community-pencil-eraser-107852.mp3')
+        .then(r => r.arrayBuffer())
+        .then(ab => audioCtx.decodeAudioData(ab))
+        .then(buf => { eraserBuffer = buf; })
+        .catch(() => {}); // fail silently — oscillator fallback below
     }
 
     function startScratchLoop() {
       if (!audioCtx || scratchOsc) return;
 
-      // Square oscillator (buzzy/raspy) → lowpass → gain
-      // Low frequencies (300-500Hz) sound like actual scratching
-      const osc    = audioCtx.createOscillator();
-      const filter = audioCtx.createBiquadFilter();
-      const gain   = audioCtx.createGain();
-
-      osc.type = 'square';
-      osc.frequency.value = 380;
-
-      filter.type = 'lowpass';
-      filter.frequency.value = 900;
-      filter.Q.value = 1.5;
-
+      const gain = audioCtx.createGain();
       gain.gain.setValueAtTime(0, audioCtx.currentTime);
-      gain.gain.linearRampToValueAtTime(0.07, audioCtx.currentTime + 0.06);
-
-      osc.connect(filter);
-      filter.connect(gain);
+      gain.gain.linearRampToValueAtTime(0.9, audioCtx.currentTime + 0.06);
       gain.connect(audioCtx.destination);
-      osc.start();
 
-      scratchOsc  = osc;
+      if (eraserBuffer) {
+        // Real eraser sound — loop it while scratching
+        const src  = audioCtx.createBufferSource();
+        src.buffer = eraserBuffer;
+        src.loop   = true;
+        src.connect(gain);
+        src.start();
+        scratchOsc  = src;
+      } else {
+        // Oscillator fallback (desktop only, iOS will have the file)
+        const osc    = audioCtx.createOscillator();
+        const filter = audioCtx.createBiquadFilter();
+        osc.type = 'square';
+        osc.frequency.value    = 380;
+        filter.type            = 'lowpass';
+        filter.frequency.value = 900;
+        osc.connect(filter);
+        filter.connect(gain);
+        osc.start();
+        scratchOsc = osc;
+      }
+
       scratchGain = gain;
     }
 
@@ -181,7 +189,7 @@
       scratchGain = null;
       scratchOsc  = null;
       g.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.08);
-      o.stop(audioCtx.currentTime + 0.1);
+      try { o.stop(audioCtx.currentTime + 0.1); } catch(_) {}
     }
 
     function playRisingTone() {
@@ -357,7 +365,7 @@
       hint.classList.add('hidden');
       const { x, y } = pos(e);
       scratch(x, y);
-      ensureAudio().then(startScratchLoop);
+      ensureAudio().then(loadEraserSound).then(startScratchLoop);
     });
 
     scratchCanvas.addEventListener('mousemove', e => {
@@ -377,7 +385,7 @@
       hint.classList.add('hidden');
       const { x, y } = pos(e);
       scratch(x, y);
-      ensureAudio().then(startScratchLoop);
+      ensureAudio().then(loadEraserSound).then(startScratchLoop);
     }, { passive: false });
 
     scratchCanvas.addEventListener('touchmove', e => {
