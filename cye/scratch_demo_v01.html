@@ -131,40 +131,43 @@
     // ── Audio ─────────────────────────────────────────────────────────────────
 
     function ensureAudio() {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // Play a silent buffer immediately — unlocks audio on iOS Safari
+        const buf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+        const src = audioCtx.createBufferSource();
+        src.buffer = buf;
+        src.connect(audioCtx.destination);
+        src.start(0);
+      }
       if (audioCtx.state === 'suspended') audioCtx.resume();
     }
 
     function playScratchSound() {
-      if (!audioCtx) return;
+      if (!audioCtx || audioCtx.state !== 'running') return;
       soundTick++;
       if (soundTick % SOUND_EVERY !== 0) return;
 
-      const bufLen = Math.floor(audioCtx.sampleRate * 0.04);
-      const buf    = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
-      const data   = buf.getChannelData(0);
-      for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+      // Two detuned oscillators give a rougher, more friction-like texture
+      [2600, 3800].forEach(freq => {
+        const osc  = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
 
-      const src    = audioCtx.createBufferSource();
-      src.buffer   = buf;
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq + (Math.random() - 0.5) * 400, audioCtx.currentTime);
 
-      const filter = audioCtx.createBiquadFilter();
-      filter.type  = 'bandpass';
-      filter.frequency.value = 2800;
-      filter.Q.value         = 1.2;
+        gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.03);
 
-      const gain   = audioCtx.createGain();
-      gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
-      gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.04);
-
-      src.connect(filter);
-      filter.connect(gain);
-      gain.connect(audioCtx.destination);
-      src.start();
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.035);
+      });
     }
 
     function playRisingTone() {
-      ensureAudio();
+      if (!audioCtx) return;
       const osc  = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.connect(gain);
