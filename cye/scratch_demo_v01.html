@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BLOOM — Scratch Reveal</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0F172A;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      gap: 2rem;
+    }
+
+    .label-above {
+      font-size: 0.72rem;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.25);
+    }
+
+    .scratch-wrapper {
+      position: relative;
+      width: min(300px, 88vw);
+      aspect-ratio: 1;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 0 0 1px rgba(8,145,178,0.15), 0 24px 48px rgba(0,0,0,0.5);
+    }
+
+    /* What gets revealed underneath */
+    .reveal-layer {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6em;
+      background: #0891B2;
+    }
+
+    .reveal-word {
+      font-size: clamp(2.2rem, 10vw, 3.8rem);
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: 0.04em;
+      line-height: 1;
+    }
+
+    .reveal-word span {
+      color: #F97316;
+    }
+
+    .reveal-direction {
+      font-size: clamp(0.7rem, 2.5vw, 0.85rem);
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.65);
+    }
+
+    /* The scratch canvas sits on top */
+    canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+      touch-action: none;
+      transition: opacity 0.4s ease;
+    }
+
+    .hint {
+      font-size: 0.72rem;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.2);
+      transition: opacity 0.6s ease;
+    }
+
+    .hint.hidden { opacity: 0; }
+  </style>
+</head>
+<body>
+
+  <p class="label-above">Scratch to reveal</p>
+
+  <div class="scratch-wrapper" id="wrapper">
+    <div class="reveal-layer">
+      <div class="reveal-word">give <span>UP</span></div>
+      <div class="reveal-direction">↑ &nbsp; upward movement</div>
+    </div>
+    <canvas id="scratch-canvas"></canvas>
+  </div>
+
+  <p class="hint" id="hint">drag your finger or mouse</p>
+
+  <script>
+    const canvas  = document.getElementById('scratch-canvas');
+    const ctx     = canvas.getContext('2d');
+    const wrapper = document.getElementById('wrapper');
+    const hint    = document.getElementById('hint');
+
+    const BRUSH_R          = 30;   // scratch brush radius (px at canvas resolution)
+    const COMPLETE_AT      = 0.65; // fraction scratched → auto-complete
+    const CHECK_EVERY      = 25;   // check completion every N pointer events
+
+    let drawing   = false;
+    let events    = 0;
+    let completed = false;
+    let audioCtx  = null;
+
+    // ── Audio ────────────────────────────────────────────────────────────────
+
+    function ensureAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    function playRisingTone() {
+      ensureAudio();
+      const osc  = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(330, audioCtx.currentTime);
+      osc.frequency.linearRampToValueAtTime(660, audioCtx.currentTime + 0.65);
+
+      gain.gain.setValueAtTime(0, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.28, audioCtx.currentTime + 0.04);
+      gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.75);
+
+      osc.start(audioCtx.currentTime);
+      osc.stop(audioCtx.currentTime + 0.8);
+    }
+
+    // ── Canvas init ──────────────────────────────────────────────────────────
+
+    function initCanvas() {
+      const rect   = wrapper.getBoundingClientRect();
+      canvas.width  = rect.width;
+      canvas.height = rect.height;
+      drawOverlay();
+    }
+
+    function drawOverlay() {
+      // Base dark fill
+      ctx.fillStyle = '#1E293B';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Teal shimmer diagonal
+      const shimmer = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      shimmer.addColorStop(0,    'rgba(8,145,178,0)');
+      shimmer.addColorStop(0.45, 'rgba(8,145,178,0.09)');
+      shimmer.addColorStop(1,    'rgba(8,145,178,0)');
+      ctx.fillStyle = shimmer;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Subtle noise texture
+      ctx.save();
+      ctx.globalAlpha = 0.06;
+      const density = Math.floor(canvas.width * canvas.height / 60);
+      for (let i = 0; i < density; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        const r = Math.random() * 1.8 + 0.4;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // ── Scratch ──────────────────────────────────────────────────────────────
+
+    function scratch(x, y) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+
+      // Soft-edged radial brush
+      const g = ctx.createRadialGradient(x, y, 0, x, y, BRUSH_R);
+      g.addColorStop(0,   'rgba(0,0,0,1)');
+      g.addColorStop(0.6, 'rgba(0,0,0,0.85)');
+      g.addColorStop(1,   'rgba(0,0,0,0)');
+
+      ctx.beginPath();
+      ctx.arc(x, y, BRUSH_R, 0, Math.PI * 2);
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.restore();
+
+      events++;
+      if (events % CHECK_EVERY === 0) checkCompletion();
+    }
+
+    function checkCompletion() {
+      if (completed) return;
+      const data        = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let transparent   = 0;
+      // Sample every 4th pixel (alpha channel = index i*4+3)
+      const step        = 4;
+      const total       = data.length / (4 * step);
+      for (let i = 3; i < data.length; i += 4 * step) {
+        if (data[i] < 128) transparent++;
+      }
+      if (transparent / total >= COMPLETE_AT) complete();
+    }
+
+    function complete() {
+      completed = true;
+      hint.classList.add('hidden');
+      playRisingTone();
+
+      // Fade out the remaining overlay
+      let opacity = 1;
+      const tick = setInterval(() => {
+        opacity -= 0.04;
+        canvas.style.opacity = Math.max(opacity, 0);
+        if (opacity <= 0) {
+          clearInterval(tick);
+          canvas.style.display = 'none';
+        }
+      }, 16);
+    }
+
+    // ── Pointer position ─────────────────────────────────────────────────────
+
+    function pos(e) {
+      const rect  = canvas.getBoundingClientRect();
+      const scaleX = canvas.width  / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const src    = e.touches ? e.touches[0] : e;
+      return {
+        x: (src.clientX - rect.left) * scaleX,
+        y: (src.clientY - rect.top)  * scaleY,
+      };
+    }
+
+    // ── Mouse events ─────────────────────────────────────────────────────────
+
+    canvas.addEventListener('mousedown', e => {
+      ensureAudio();
+      drawing = true;
+      hint.classList.add('hidden');
+      const { x, y } = pos(e);
+      scratch(x, y);
+    });
+
+    canvas.addEventListener('mousemove', e => {
+      if (!drawing) return;
+      const { x, y } = pos(e);
+      scratch(x, y);
+    });
+
+    canvas.addEventListener('mouseup',    () => drawing = false);
+    canvas.addEventListener('mouseleave', () => drawing = false);
+
+    // ── Touch events ─────────────────────────────────────────────────────────
+
+    canvas.addEventListener('touchstart', e => {
+      e.preventDefault();
+      ensureAudio();
+      drawing = true;
+      hint.classList.add('hidden');
+      const { x, y } = pos(e);
+      scratch(x, y);
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', e => {
+      e.preventDefault();
+      if (!drawing) return;
+      const { x, y } = pos(e);
+      scratch(x, y);
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', () => drawing = false);
+
+    // ── Responsive ───────────────────────────────────────────────────────────
+
+    const ro = new ResizeObserver(() => { if (!completed) initCanvas(); });
+    ro.observe(wrapper);
+
+    initCanvas();
+  </script>
+
+</body>
+</html>
