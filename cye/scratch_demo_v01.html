@@ -34,7 +34,6 @@
       box-shadow: 0 0 0 1px rgba(8,145,178,0.15), 0 24px 48px rgba(0,0,0,0.5);
     }
 
-    /* What gets revealed underneath */
     .reveal-layer {
       position: absolute;
       inset: 0;
@@ -54,9 +53,7 @@
       line-height: 1;
     }
 
-    .reveal-word span {
-      color: #F97316;
-    }
+    .reveal-word span { color: #F97316; }
 
     .reveal-direction {
       font-size: clamp(0.7rem, 2.5vw, 0.85rem);
@@ -65,15 +62,22 @@
       color: rgba(255,255,255,0.65);
     }
 
-    /* The scratch canvas sits on top */
+    /* Two canvases stacked: scratch below, particles above */
     canvas {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
-      cursor: crosshair;
       touch-action: none;
-      transition: opacity 0.4s ease;
+    }
+
+    #scratch-canvas {
+      cursor: crosshair;
+      transition: opacity 0.5s ease;
+    }
+
+    #particle-canvas {
+      pointer-events: none; /* particles don't block input */
     }
 
     .hint {
@@ -97,29 +101,65 @@
       <div class="reveal-direction">↑ &nbsp; upward movement</div>
     </div>
     <canvas id="scratch-canvas"></canvas>
+    <canvas id="particle-canvas"></canvas>
   </div>
 
   <p class="hint" id="hint">drag your finger or mouse</p>
 
   <script>
-    const canvas  = document.getElementById('scratch-canvas');
-    const ctx     = canvas.getContext('2d');
-    const wrapper = document.getElementById('wrapper');
-    const hint    = document.getElementById('hint');
+    const scratchCanvas  = document.getElementById('scratch-canvas');
+    const sCtx           = scratchCanvas.getContext('2d');
+    const particleCanvas = document.getElementById('particle-canvas');
+    const pCtx           = particleCanvas.getContext('2d');
+    const wrapper        = document.getElementById('wrapper');
+    const hint           = document.getElementById('hint');
 
-    const BRUSH_R          = 30;   // scratch brush radius (px at canvas resolution)
-    const COMPLETE_AT      = 0.65; // fraction scratched → auto-complete
-    const CHECK_EVERY      = 25;   // check completion every N pointer events
+    const BRUSH_R       = 30;
+    const COMPLETE_AT   = 0.85;
+    const CHECK_EVERY   = 25;
+    const SOUND_EVERY   = 4;   // play scratch sound every N move events
 
     let drawing   = false;
     let events    = 0;
+    let soundTick = 0;
     let completed = false;
+    let animating = false;
     let audioCtx  = null;
 
-    // ── Audio ────────────────────────────────────────────────────────────────
+    const particles = [];
+
+    // ── Audio ─────────────────────────────────────────────────────────────────
 
     function ensureAudio() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    function playScratchSound() {
+      if (!audioCtx) return;
+      soundTick++;
+      if (soundTick % SOUND_EVERY !== 0) return;
+
+      const bufLen = Math.floor(audioCtx.sampleRate * 0.04);
+      const buf    = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
+      const data   = buf.getChannelData(0);
+      for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+
+      const src    = audioCtx.createBufferSource();
+      src.buffer   = buf;
+
+      const filter = audioCtx.createBiquadFilter();
+      filter.type  = 'bandpass';
+      filter.frequency.value = 2800;
+      filter.Q.value         = 1.2;
+
+      const gain   = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.04);
+
+      src.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+      src.start();
     }
 
     function playRisingTone() {
@@ -141,61 +181,108 @@
       osc.stop(audioCtx.currentTime + 0.8);
     }
 
-    // ── Canvas init ──────────────────────────────────────────────────────────
+    // ── Canvas init ───────────────────────────────────────────────────────────
 
     function initCanvas() {
-      const rect   = wrapper.getBoundingClientRect();
-      canvas.width  = rect.width;
-      canvas.height = rect.height;
+      const rect = wrapper.getBoundingClientRect();
+      scratchCanvas.width  = particleCanvas.width  = rect.width;
+      scratchCanvas.height = particleCanvas.height = rect.height;
       drawOverlay();
     }
 
     function drawOverlay() {
-      // Base dark fill
-      ctx.fillStyle = '#1E293B';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      sCtx.fillStyle = '#1E293B';
+      sCtx.fillRect(0, 0, scratchCanvas.width, scratchCanvas.height);
 
-      // Teal shimmer diagonal
-      const shimmer = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      const shimmer = sCtx.createLinearGradient(0, 0, scratchCanvas.width, scratchCanvas.height);
       shimmer.addColorStop(0,    'rgba(8,145,178,0)');
-      shimmer.addColorStop(0.45, 'rgba(8,145,178,0.09)');
+      shimmer.addColorStop(0.45, 'rgba(8,145,178,0.1)');
       shimmer.addColorStop(1,    'rgba(8,145,178,0)');
-      ctx.fillStyle = shimmer;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      sCtx.fillStyle = shimmer;
+      sCtx.fillRect(0, 0, scratchCanvas.width, scratchCanvas.height);
 
-      // Subtle noise texture
-      ctx.save();
-      ctx.globalAlpha = 0.06;
-      const density = Math.floor(canvas.width * canvas.height / 60);
+      sCtx.save();
+      sCtx.globalAlpha = 0.07;
+      const density = Math.floor(scratchCanvas.width * scratchCanvas.height / 55);
       for (let i = 0; i < density; i++) {
-        const x = Math.random() * canvas.width;
-        const y = Math.random() * canvas.height;
-        const r = Math.random() * 1.8 + 0.4;
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fillStyle = '#ffffff';
-        ctx.fill();
+        const x = Math.random() * scratchCanvas.width;
+        const y = Math.random() * scratchCanvas.height;
+        const r = Math.random() * 1.8 + 0.3;
+        sCtx.beginPath();
+        sCtx.arc(x, y, r, 0, Math.PI * 2);
+        sCtx.fillStyle = '#ffffff';
+        sCtx.fill();
       }
-      ctx.restore();
+      sCtx.restore();
     }
 
-    // ── Scratch ──────────────────────────────────────────────────────────────
+    // ── Particles ─────────────────────────────────────────────────────────────
+
+    function spawnParticles(x, y) {
+      const count = Math.floor(Math.random() * 4) + 2;
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist  = BRUSH_R * (0.75 + Math.random() * 0.7);
+        particles.push({
+          x:    x + Math.cos(angle) * dist,
+          y:    y + Math.sin(angle) * dist,
+          vx:   (Math.random() - 0.5) * 1.2,
+          vy:   Math.random() * 1.2 + 0.3,
+          life: 0.9 + Math.random() * 0.3,
+          size: Math.random() * 2.2 + 0.8,
+        });
+      }
+      if (!animating) runParticles();
+    }
+
+    function runParticles() {
+      animating = true;
+      pCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x    += p.vx;
+        p.y    += p.vy;
+        p.vy   += 0.06; // gravity
+        p.life -= 0.028;
+
+        if (p.life <= 0) { particles.splice(i, 1); continue; }
+
+        pCtx.save();
+        pCtx.globalAlpha = Math.min(p.life, 0.85);
+        pCtx.fillStyle   = '#334155';
+        pCtx.beginPath();
+        pCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        pCtx.fill();
+        pCtx.restore();
+      }
+
+      if (particles.length > 0) {
+        requestAnimationFrame(runParticles);
+      } else {
+        animating = false;
+      }
+    }
+
+    // ── Scratch ───────────────────────────────────────────────────────────────
 
     function scratch(x, y) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'destination-out';
+      sCtx.save();
+      sCtx.globalCompositeOperation = 'destination-out';
 
-      // Soft-edged radial brush
-      const g = ctx.createRadialGradient(x, y, 0, x, y, BRUSH_R);
+      const g = sCtx.createRadialGradient(x, y, 0, x, y, BRUSH_R);
       g.addColorStop(0,   'rgba(0,0,0,1)');
-      g.addColorStop(0.6, 'rgba(0,0,0,0.85)');
+      g.addColorStop(0.55,'rgba(0,0,0,0.9)');
       g.addColorStop(1,   'rgba(0,0,0,0)');
 
-      ctx.beginPath();
-      ctx.arc(x, y, BRUSH_R, 0, Math.PI * 2);
-      ctx.fillStyle = g;
-      ctx.fill();
-      ctx.restore();
+      sCtx.beginPath();
+      sCtx.arc(x, y, BRUSH_R, 0, Math.PI * 2);
+      sCtx.fillStyle = g;
+      sCtx.fill();
+      sCtx.restore();
+
+      spawnParticles(x, y);
+      playScratchSound();
 
       events++;
       if (events % CHECK_EVERY === 0) checkCompletion();
@@ -203,15 +290,14 @@
 
     function checkCompletion() {
       if (completed) return;
-      const data        = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-      let transparent   = 0;
-      // Sample every 4th pixel (alpha channel = index i*4+3)
-      const step        = 4;
-      const total       = data.length / (4 * step);
+      const data  = sCtx.getImageData(0, 0, scratchCanvas.width, scratchCanvas.height).data;
+      let clear   = 0;
+      const step  = 4;
+      const total = data.length / (4 * step);
       for (let i = 3; i < data.length; i += 4 * step) {
-        if (data[i] < 128) transparent++;
+        if (data[i] < 128) clear++;
       }
-      if (transparent / total >= COMPLETE_AT) complete();
+      if (clear / total >= COMPLETE_AT) complete();
     }
 
     function complete() {
@@ -219,24 +305,23 @@
       hint.classList.add('hidden');
       playRisingTone();
 
-      // Fade out the remaining overlay
       let opacity = 1;
       const tick = setInterval(() => {
-        opacity -= 0.04;
-        canvas.style.opacity = Math.max(opacity, 0);
+        opacity -= 0.035;
+        scratchCanvas.style.opacity = Math.max(opacity, 0);
         if (opacity <= 0) {
           clearInterval(tick);
-          canvas.style.display = 'none';
+          scratchCanvas.style.display = 'none';
         }
       }, 16);
     }
 
-    // ── Pointer position ─────────────────────────────────────────────────────
+    // ── Pointer position ──────────────────────────────────────────────────────
 
     function pos(e) {
-      const rect  = canvas.getBoundingClientRect();
-      const scaleX = canvas.width  / rect.width;
-      const scaleY = canvas.height / rect.height;
+      const rect   = scratchCanvas.getBoundingClientRect();
+      const scaleX = scratchCanvas.width  / rect.width;
+      const scaleY = scratchCanvas.height / rect.height;
       const src    = e.touches ? e.touches[0] : e;
       return {
         x: (src.clientX - rect.left) * scaleX,
@@ -244,9 +329,9 @@
       };
     }
 
-    // ── Mouse events ─────────────────────────────────────────────────────────
+    // ── Mouse events ──────────────────────────────────────────────────────────
 
-    canvas.addEventListener('mousedown', e => {
+    scratchCanvas.addEventListener('mousedown', e => {
       ensureAudio();
       drawing = true;
       hint.classList.add('hidden');
@@ -254,18 +339,18 @@
       scratch(x, y);
     });
 
-    canvas.addEventListener('mousemove', e => {
+    scratchCanvas.addEventListener('mousemove', e => {
       if (!drawing) return;
       const { x, y } = pos(e);
       scratch(x, y);
     });
 
-    canvas.addEventListener('mouseup',    () => drawing = false);
-    canvas.addEventListener('mouseleave', () => drawing = false);
+    scratchCanvas.addEventListener('mouseup',    () => drawing = false);
+    scratchCanvas.addEventListener('mouseleave', () => drawing = false);
 
-    // ── Touch events ─────────────────────────────────────────────────────────
+    // ── Touch events ──────────────────────────────────────────────────────────
 
-    canvas.addEventListener('touchstart', e => {
+    scratchCanvas.addEventListener('touchstart', e => {
       e.preventDefault();
       ensureAudio();
       drawing = true;
@@ -274,16 +359,16 @@
       scratch(x, y);
     }, { passive: false });
 
-    canvas.addEventListener('touchmove', e => {
+    scratchCanvas.addEventListener('touchmove', e => {
       e.preventDefault();
       if (!drawing) return;
       const { x, y } = pos(e);
       scratch(x, y);
     }, { passive: false });
 
-    canvas.addEventListener('touchend', () => drawing = false);
+    scratchCanvas.addEventListener('touchend', () => drawing = false);
 
-    // ── Responsive ───────────────────────────────────────────────────────────
+    // ── Responsive ────────────────────────────────────────────────────────────
 
     const ro = new ResizeObserver(() => { if (!completed) initCanvas(); });
     ro.observe(wrapper);
