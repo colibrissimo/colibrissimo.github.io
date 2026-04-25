@@ -132,48 +132,56 @@
 
     // ── Audio ─────────────────────────────────────────────────────────────────
 
+    // Returns a promise that resolves when the context is running.
+    // The silent buffer is the iOS unlock trick — must happen in a gesture handler.
     function ensureAudio() {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state === 'suspended') audioCtx.resume();
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const buf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+        const src = audioCtx.createBufferSource();
+        src.buffer = buf;
+        src.connect(audioCtx.destination);
+        src.start(0);
+      }
+      return audioCtx.resume(); // promise → resolves when state === 'running'
     }
 
     function startScratchLoop() {
       if (!audioCtx || scratchOsc) return;
 
-      // Two detuned sawtooth oscillators → filtered → gain
-      const merge = audioCtx.createGain();
-      merge.gain.value = 0;  // silent until finger moves
-      merge.connect(audioCtx.destination);
+      // Square oscillator (buzzy/raspy) → lowpass → gain
+      // Low frequencies (300-500Hz) sound like actual scratching
+      const osc    = audioCtx.createOscillator();
+      const filter = audioCtx.createBiquadFilter();
+      const gain   = audioCtx.createGain();
 
-      [2500, 3900].forEach(freq => {
-        const osc = audioCtx.createOscillator();
-        osc.type = 'sawtooth';
-        osc.frequency.value = freq;
-        const filter = audioCtx.createBiquadFilter();
-        filter.type = 'bandpass';
-        filter.frequency.value = freq;
-        filter.Q.value = 2;
-        osc.connect(filter);
-        filter.connect(merge);
-        osc.start();
-      });
+      osc.type = 'square';
+      osc.frequency.value = 380;
 
-      scratchGain = merge;
-      scratchOsc  = true; // flag — we don't need individual osc refs
-      // Fade in
-      scratchGain.gain.setValueAtTime(0, audioCtx.currentTime);
-      scratchGain.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + 0.05);
+      filter.type = 'lowpass';
+      filter.frequency.value = 900;
+      filter.Q.value = 1.5;
+
+      gain.gain.setValueAtTime(0, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.07, audioCtx.currentTime + 0.06);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+
+      scratchOsc  = osc;
+      scratchGain = gain;
     }
 
     function stopScratchLoop() {
-      if (!scratchGain) return;
-      scratchGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.08);
-      // Disconnect after fade
-      setTimeout(() => {
-        try { scratchGain.disconnect(); } catch(_) {}
-        scratchGain = null;
-        scratchOsc  = null;
-      }, 120);
+      if (!scratchGain || !scratchOsc) return;
+      const g = scratchGain;
+      const o = scratchOsc;
+      scratchGain = null;
+      scratchOsc  = null;
+      g.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.08);
+      o.stop(audioCtx.currentTime + 0.1);
     }
 
     function playRisingTone() {
@@ -345,12 +353,11 @@
     // ── Mouse events ──────────────────────────────────────────────────────────
 
     scratchCanvas.addEventListener('mousedown', e => {
-      ensureAudio();
       drawing = true;
       hint.classList.add('hidden');
-      startScratchLoop();
       const { x, y } = pos(e);
       scratch(x, y);
+      ensureAudio().then(startScratchLoop);
     });
 
     scratchCanvas.addEventListener('mousemove', e => {
@@ -366,12 +373,11 @@
 
     scratchCanvas.addEventListener('touchstart', e => {
       e.preventDefault();
-      ensureAudio();
       drawing = true;
       hint.classList.add('hidden');
-      startScratchLoop();
       const { x, y } = pos(e);
       scratch(x, y);
+      ensureAudio().then(startScratchLoop);
     }, { passive: false });
 
     scratchCanvas.addEventListener('touchmove', e => {
