@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>BLOOM</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      background: linear-gradient(170deg, #BAE6FD 0%, #93C5FD 30%, #FED7AA 70%, #FEF3C7 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Nunito', 'Segoe UI', Arial, sans-serif;
+      position: relative;
+      min-height: 100vh;
+    }
+
+    /* ── Clouds ── */
+    .cloud {
+      position: absolute;
+      background: white;
+      border-radius: 50%;
+      opacity: 0.75;
+    }
+    .cloud::before, .cloud::after {
+      content: '';
+      position: absolute;
+      background: white;
+      border-radius: 50%;
+    }
+
+    .c1 { width: 120px; height: 45px; top: 12%; left: -15%; animation: drift 28s linear infinite; }
+    .c1::before { width: 60px; height: 60px; top: -28px; left: 15px; }
+    .c1::after  { width: 80px; height: 50px; top: -20px; left: 45px; }
+
+    .c2 { width: 90px; height: 35px; top: 22%; left: -12%; animation: drift 38s linear infinite 6s; opacity: 0.55; }
+    .c2::before { width: 50px; height: 50px; top: -22px; left: 10px; }
+    .c2::after  { width: 65px; height: 40px; top: -14px; left: 35px; }
+
+    .c3 { width: 140px; height: 50px; top: 8%; right: -20%; animation: drift2 32s linear infinite 2s; }
+    .c3::before { width: 70px; height: 70px; top: -32px; left: 20px; }
+    .c3::after  { width: 90px; height: 58px; top: -22px; left: 55px; }
+
+    .c4 { width: 80px; height: 30px; top: 35%; right: -10%; animation: drift2 42s linear infinite 10s; opacity: 0.5; }
+    .c4::before { width: 40px; height: 40px; top: -18px; left: 8px; }
+    .c4::after  { width: 55px; height: 35px; top: -12px; left: 28px; }
+
+    @keyframes drift  { from { transform: translateX(0);    } to { transform: translateX(130vw); } }
+    @keyframes drift2 { from { transform: translateX(0);    } to { transform: translateX(-130vw); } }
+
+    /* ── Sparkles scattered in sky ── */
+    .sparkle {
+      position: absolute;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      opacity: 0;
+      animation: twinkle 3s ease-in-out infinite;
+    }
+
+    @keyframes twinkle {
+      0%, 100% { opacity: 0; transform: scale(0.5); }
+      50%       { opacity: 0.9; transform: scale(1.3); }
+    }
+
+    /* ── Balloon wrapper — enters from above ── */
+    .balloon-stage {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      animation: arriveFromAbove 1.6s cubic-bezier(0.22, 1, 0.36, 1) forwards,
+                 bob 5s ease-in-out 1.6s infinite;
+      transform: translateY(-110vh);
+    }
+
+    @keyframes arriveFromAbove {
+      from { transform: translateY(-110vh); }
+      to   { transform: translateY(0); }
+    }
+
+    @keyframes bob {
+      0%, 100% { transform: translateY(0)      rotate(-1deg); }
+      25%       { transform: translateY(-18px)  rotate(0.8deg); }
+      50%       { transform: translateY(-8px)   rotate(-0.5deg); }
+      75%       { transform: translateY(-22px)  rotate(1deg); }
+    }
+
+    svg.balloon {
+      width: min(260px, 65vw);
+      height: auto;
+      filter: drop-shadow(0 18px 36px rgba(0,0,0,0.18));
+    }
+
+    /* Rope from balloon to basket */
+    .ropes {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    /* ── Basket ── */
+    .basket-wrap {
+      margin-top: -4px;
+      position: relative;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    /* ── Odilon peeking from basket ── */
+    .odilon-peek {
+      position: absolute;
+      bottom: 30px;
+      width: min(68px, 17vw);
+      left: 50%;
+      transform: translateX(-50%);
+      animation: peek 5s ease-in-out 2.2s infinite;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+      z-index: 3;
+    }
+
+    @keyframes peek {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      40%       { transform: translateX(-50%) translateY(-8px); }
+      60%       { transform: translateX(-50%) translateY(-5px); }
+    }
+
+    /* ── BLOOM wordmark below balloon area ── */
+    .bloom-title {
+      margin-top: 2.2rem;
+      font-size: clamp(2rem, 8vw, 3.2rem);
+      font-weight: 900;
+      letter-spacing: 0.28em;
+      background: linear-gradient(135deg, #0891B2 30%, #F97316 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.10));
+      user-select: none;
+    }
+
+    .bloom-tagline {
+      margin-top: 0.5rem;
+      font-size: clamp(0.65rem, 2.2vw, 0.85rem);
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: #0891B2;
+      opacity: 0.7;
+      user-select: none;
+    }
+
+    /* ── Tap prompt ── */
+    .tap-prompt {
+      margin-top: 2.4rem;
+      padding: 0.9em 2.4em;
+      background: linear-gradient(135deg, #0891B2, #0E7490);
+      color: white;
+      border: none;
+      border-radius: 50px;
+      font-size: clamp(0.85rem, 3vw, 1.05rem);
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: 0 6px 22px rgba(8,145,178,0.38);
+      opacity: 0;
+      transform: translateY(12px);
+      animation: fadeUpIn 0.7s ease 2.4s forwards;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .tap-prompt:hover, .tap-prompt:active {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 28px rgba(8,145,178,0.45);
+    }
+
+    @keyframes fadeUpIn {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Ground / meadow strip ── */
+    .meadow {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 22%;
+      background: linear-gradient(180deg, #86EFAC 0%, #4ADE80 60%, #22C55E 100%);
+      border-radius: 60% 60% 0 0 / 25% 25% 0 0;
+    }
+
+    .meadow::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 100%;
+      background: radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.18), transparent 70%);
+    }
+
+    /* Little flower dots on meadow */
+    .flower {
+      position: absolute;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      top: 12%;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Clouds -->
+  <div class="cloud c1"></div>
+  <div class="cloud c2"></div>
+  <div class="cloud c3"></div>
+  <div class="cloud c4"></div>
+
+  <!-- Sparkle dots -->
+  <div id="sparkle-field"></div>
+
+  <!-- Meadow strip at bottom -->
+  <div class="meadow" id="meadow"></div>
+
+  <!-- Main content -->
+  <div class="balloon-stage" id="stage">
+
+    <!-- The balloon SVG -->
+    <svg class="balloon" viewBox="0 0 200 240" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <!-- Panel gradients — alternating teal & orange, 8 panels -->
+        <radialGradient id="g1" cx="50%" cy="30%" r="70%">
+          <stop offset="0%" stop-color="#22D3EE"/>
+          <stop offset="100%" stop-color="#0E7490"/>
+        </radialGradient>
+        <radialGradient id="g2" cx="50%" cy="30%" r="70%">
+          <stop offset="0%" stop-color="#FDBA74"/>
+          <stop offset="100%" stop-color="#EA580C"/>
+        </radialGradient>
+        <radialGradient id="g3" cx="50%" cy="30%" r="70%">
+          <stop offset="0%" stop-color="#38BDF8"/>
+          <stop offset="100%" stop-color="#0891B2"/>
+        </radialGradient>
+        <radialGradient id="g4" cx="50%" cy="30%" r="70%">
+          <stop offset="0%" stop-color="#FED7AA"/>
+          <stop offset="100%" stop-color="#F97316"/>
+        </radialGradient>
+        <!-- Highlight overlay -->
+        <radialGradient id="gh" cx="35%" cy="25%" r="55%">
+          <stop offset="0%" stop-color="rgba(255,255,255,0.38)"/>
+          <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+        </radialGradient>
+        <!-- Clip path for balloon shape -->
+        <clipPath id="balloon-clip">
+          <ellipse cx="100" cy="105" rx="82" ry="95"/>
+        </clipPath>
+      </defs>
+
+      <!-- Balloon body — 8 vertical panels clipped to ellipse -->
+      <g clip-path="url(#balloon-clip)">
+        <!-- Panel 1 -->
+        <path d="M100,10 C60,10 20,55 18,105 C16,155 55,195 100,200 L100,10Z" fill="url(#g1)"/>
+        <!-- Panel 2 -->
+        <path d="M100,10 L100,200 C145,195 184,155 182,105 C180,55 140,10 100,10Z" fill="url(#g2)"/>
+        <!-- Panel 3: left quarter -->
+        <path d="M100,10 C78,10 42,42 28,85 L28,125 C42,168 78,195 100,200 L100,10Z" fill="url(#g3)" opacity="0.55"/>
+        <!-- Panel 4: right quarter -->
+        <path d="M100,10 L100,200 C122,195 158,168 172,125 L172,85 C158,42 122,10 100,10Z" fill="url(#g4)" opacity="0.55"/>
+        <!-- Texture lines -->
+        <g stroke="rgba(255,255,255,0.15)" stroke-width="1" fill="none">
+          <line x1="100" y1="10" x2="100" y2="200"/>
+          <line x1="60"  y1="12" x2="50"  y2="195"/>
+          <line x1="140" y1="12" x2="150" y2="195"/>
+          <line x1="30"  y1="60" x2="25"  y2="150"/>
+          <line x1="170" y1="60" x2="175" y2="150"/>
+        </g>
+        <!-- Highlight -->
+        <ellipse cx="100" cy="105" rx="82" ry="95" fill="url(#gh)"/>
+      </g>
+
+      <!-- Balloon outline -->
+      <ellipse cx="100" cy="105" rx="82" ry="95" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.5"/>
+
+      <!-- Bottom opening of balloon (the skirt) -->
+      <path d="M68,192 Q84,210 100,212 Q116,210 132,192" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+
+      <!-- Ropes from balloon to basket -->
+      <line x1="68"  y1="195" x2="72"  y2="228" stroke="#92400E" stroke-width="1.8" opacity="0.7"/>
+      <line x1="132" y1="195" x2="128" y2="228" stroke="#92400E" stroke-width="1.8" opacity="0.7"/>
+      <line x1="88"  y1="198" x2="90"  y2="228" stroke="#92400E" stroke-width="1.4" opacity="0.55"/>
+      <line x1="112" y1="198" x2="110" y2="228" stroke="#92400E" stroke-width="1.4" opacity="0.55"/>
+
+      <!-- Basket -->
+      <rect x="72" y="226" width="56" height="34" rx="6" ry="6" fill="#D97706"/>
+      <rect x="72" y="226" width="56" height="34" rx="6" ry="6" fill="url(#g2)" opacity="0.3"/>
+      <!-- Basket weave lines -->
+      <g stroke="rgba(0,0,0,0.18)" stroke-width="1" fill="none">
+        <line x1="88"  y1="226" x2="88"  y2="260"/>
+        <line x1="100" y1="226" x2="100" y2="260"/>
+        <line x1="112" y1="226" x2="112" y2="260"/>
+        <line x1="72"  y1="238" x2="128" y2="238"/>
+        <line x1="72"  y1="249" x2="128" y2="249"/>
+      </g>
+      <!-- Basket rim -->
+      <rect x="70" y="224" width="60" height="7" rx="3" fill="#92400E"/>
+
+      <!-- BLOOM on balloon — subtle white letters -->
+      <text x="100" y="96" text-anchor="middle" dominant-baseline="middle"
+            font-family="Georgia, serif" font-weight="900"
+            font-size="26" fill="rgba(255,255,255,0.82)"
+            letter-spacing="3">BLOOM</text>
+    </svg>
+
+    <!-- Odilon peeking out of basket — visible once image loads -->
+    <img class="odilon-peek" id="odilon"
+         src="./images/OdilonSketchedOrangeTeal-removebg-preview.png"
+         alt="Odilon" onerror="this.style.display='none'">
+
+    <p class="bloom-title">BLOOM</p>
+    <p class="bloom-tagline">Colour your English</p>
+
+    <a class="tap-prompt" href="./scratch_demo_v01.html">
+      ✨ Tap to play
+    </a>
+
+  </div>
+
+  <script>
+    // ── Sparkle field ─────────────────────────────────────────────────────────
+    const field = document.getElementById('sparkle-field');
+    const SPARKLE_COLOURS = ['#F97316','#0891B2','#FDE68A','#67E8F9','#FDBA74','#22D3EE'];
+    const count = 28;
+    for (let i = 0; i < count; i++) {
+      const s = document.createElement('div');
+      s.className = 'sparkle';
+      s.style.left   = `${Math.random() * 100}vw`;
+      s.style.top    = `${Math.random() * 75}vh`;
+      s.style.width  = `${Math.random() * 5 + 3}px`;
+      s.style.height = s.style.width;
+      s.style.background = SPARKLE_COLOURS[Math.floor(Math.random() * SPARKLE_COLOURS.length)];
+      s.style.animationDuration  = `${2 + Math.random() * 3}s`;
+      s.style.animationDelay     = `${Math.random() * 4}s`;
+      field.appendChild(s);
+    }
+
+    // ── Meadow flowers ────────────────────────────────────────────────────────
+    const meadow = document.getElementById('meadow');
+    const FLOWER_COLOURS = ['#F97316','#0891B2','#FDE68A','#ffffff','#FDBA74'];
+    for (let i = 0; i < 22; i++) {
+      const f = document.createElement('div');
+      f.className = 'flower';
+      f.style.left = `${3 + Math.random() * 94}%`;
+      f.style.top  = `${10 + Math.random() * 60}%`;
+      f.style.background = FLOWER_COLOURS[Math.floor(Math.random() * FLOWER_COLOURS.length)];
+      f.style.width  = `${5 + Math.random() * 6}px`;
+      f.style.height = f.style.width;
+      f.style.borderRadius = '50%';
+      f.style.opacity = (0.55 + Math.random() * 0.45).toString();
+      meadow.appendChild(f);
+    }
+  </script>
+
+</body>
+</html>
