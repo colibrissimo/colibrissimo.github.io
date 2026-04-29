@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>CYE · OSASCOMP · Error Correction Blitz</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --teal: #0891b2;
+  --teal-glow: rgba(8,145,178,0.3);
+  --orange: #f97316;
+  --orange-glow: rgba(249,115,22,0.3);
+  --gold: #ffd700;
+  --gold-glow: rgba(255,215,0,0.3);
+  --dark: #0f172a;
+  --card-bg: #1e293b;
+  --grey: #94a3b8;
+  --red: #ef4444;
+  --red-glow: rgba(239,68,68,0.3);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; min-height: 100%;
+  background: var(--dark);
+  font-family: 'Nunito', sans-serif;
+  color: #e2e8f0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse at 15% 20%, var(--teal-glow) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 80%, var(--orange-glow) 0%, transparent 50%);
+  pointer-events: none; z-index: 0;
+}
+
+/* ── Layout ── */
+#app {
+  position: relative; z-index: 1;
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center;
+  padding: 0 16px 48px;
+}
+
+/* ── Header ── */
+#header {
+  width: 100%; text-align: center;
+  padding: 18px 0 10px;
+}
+#header .label {
+  font-size: 0.62em; letter-spacing: 0.22em;
+  color: var(--grey); text-transform: uppercase;
+}
+#header h1 {
+  font-size: 1.5em; font-weight: 900; margin: 4px 0 2px;
+  background: linear-gradient(135deg, var(--teal), var(--gold), var(--orange));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+#header .subtitle { font-size: 0.78em; color: var(--grey); }
+
+/* ── HUD ── */
+#hud {
+  display: flex; gap: 18px; align-items: center;
+  font-size: 0.78em; font-weight: 700;
+  margin-bottom: 14px;
+}
+#hud .hud-score { color: var(--teal); }
+#hud .hud-round { color: var(--grey); }
+#hud .hud-timer { color: var(--gold); font-variant-numeric: tabular-nums; }
+#streak-wrap {
+  display: flex; align-items: center; gap: 5px;
+  color: var(--gold);
+}
+#streak-badge {
+  display: inline-block; min-width: 28px; text-align: center;
+  padding: 2px 8px; border-radius: 6px;
+  background: rgba(255,215,0,0.12);
+  border: 1px solid rgba(255,215,0,0.25);
+  font-size: 1em; font-variant-numeric: tabular-nums;
+  transition: transform 0.15s;
+}
+#streak-badge.bump { animation: streakBump 0.3s ease; }
+@keyframes streakBump {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.4); }
+  100% { transform: scale(1); }
+}
+
+/* ── Progress bar ── */
+#progress-bar {
+  width: 100%; max-width: 580px;
+  height: 3px; background: rgba(255,255,255,0.08);
+  border-radius: 2px; margin-bottom: 18px; overflow: hidden;
+}
+#progress-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--orange), var(--gold), var(--teal));
+  border-radius: 2px; transition: width 0.4s ease;
+}
+
+/* ── Game card ── */
+#game-card {
+  width: 100%; max-width: 580px;
+  background: rgba(30,41,59,0.9);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 18px;
+  padding: 28px 24px 22px;
+  text-align: center;
+}
+
+#instruction {
+  font-size: 0.7em; text-transform: uppercase;
+  letter-spacing: 0.15em; color: var(--grey);
+  margin-bottom: 22px; line-height: 1.5;
+}
+
+/* ── Phrase display ── */
+#phrase-display {
+  display: flex; flex-wrap: wrap;
+  align-items: center; justify-content: center;
+  gap: 8px 6px; margin-bottom: 22px;
+  min-height: 56px;
+}
+
+.phrase-word {
+  font-size: 1.45em; font-weight: 800;
+  color: var(--grey); letter-spacing: 0.02em;
+}
+
+.phrase-adj {
+  font-size: 1.45em; font-weight: 800;
+  padding: 6px 14px; border-radius: 10px;
+  background: rgba(255,255,255,0.06);
+  border: 2px solid rgba(255,255,255,0.1);
+  color: #e2e8f0;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.12s;
+}
+.phrase-adj:hover {
+  background: rgba(8,145,178,0.12);
+  border-color: var(--teal);
+  color: var(--teal);
+  transform: translateY(-2px);
+}
+.phrase-adj:active { transform: translateY(0); }
+
+.phrase-adj.flash-correct {
+  background: rgba(8,145,178,0.22) !important;
+  border-color: var(--teal) !important;
+  color: var(--teal) !important;
+  animation: adjCorrect 0.45s ease;
+}
+.phrase-adj.flash-wrong {
+  background: rgba(249,115,22,0.18) !important;
+  border-color: var(--orange) !important;
+  color: var(--orange) !important;
+  animation: adjWrong 0.4s ease;
+}
+@keyframes adjCorrect {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+@keyframes adjWrong {
+  0%,100% { transform: translateX(0); }
+  20% { transform: translateX(-7px); }
+  40% { transform: translateX(7px); }
+  60% { transform: translateX(-5px); }
+  80% { transform: translateX(4px); }
+}
+
+/* ── "Looks right!" button ── */
+#btn-correct {
+  background: rgba(255,255,255,0.05);
+  border: 1.5px solid rgba(255,255,255,0.14);
+  color: var(--grey);
+  padding: 11px 26px; border-radius: 12px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800; font-size: 0.9em;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  letter-spacing: 0.06em;
+}
+#btn-correct:hover {
+  background: rgba(8,145,178,0.12);
+  border-color: var(--teal);
+  color: var(--teal);
+}
+
+/* ── Reveal panel ── */
+#reveal-panel {
+  width: 100%; max-width: 580px;
+  margin-top: 14px;
+  background: rgba(30,41,59,0.9);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 16px 22px;
+  text-align: center;
+  display: none;
+}
+#reveal-panel.visible { display: block; animation: revealIn 0.3s ease; }
+@keyframes revealIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+#reveal-phrase {
+  font-size: 1.1em; font-weight: 800;
+  color: var(--teal); margin-bottom: 6px;
+}
+#reveal-hint {
+  font-size: 0.78em; color: var(--grey); line-height: 1.6;
+  margin-bottom: 14px;
+}
+#btn-next {
+  background: linear-gradient(135deg, var(--teal), var(--orange));
+  border: none; color: white;
+  padding: 10px 28px; border-radius: 10px;
+  font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.9em;
+  cursor: pointer; transition: transform 0.15s, opacity 0.15s;
+  letter-spacing: 0.05em;
+}
+#btn-next:hover { transform: scale(1.05); }
+#btn-next:disabled { opacity: 0.3; cursor: default; transform: none; }
+
+/* ── Streak milestone toast ── */
+#milestone-toast {
+  position: fixed; top: 20%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 35; font-size: 1.3em; font-weight: 900;
+  pointer-events: none; opacity: 0;
+  text-align: center; white-space: nowrap;
+  color: var(--gold);
+  text-shadow: 0 0 30px var(--gold-glow);
+}
+#milestone-toast.visible { animation: milestoneAnim 1.5s ease forwards; }
+@keyframes milestoneAnim {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+  20%  { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+  70%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -60%) scale(1); }
+}
+
+/* ── Feedback ── */
+#feedback {
+  position: fixed; top: 44%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 30; font-size: 1.7em; font-weight: 900;
+  pointer-events: none; opacity: 0;
+  transition: opacity 0.2s; text-align: center; white-space: nowrap;
+}
+#feedback.visible { opacity: 1; }
+#feedback.correct { color: var(--teal); text-shadow: 0 0 30px var(--teal-glow); }
+#feedback.wrong   { color: var(--orange); text-shadow: 0 0 30px var(--orange-glow); }
+#feedback.timeout { color: var(--red); text-shadow: 0 0 30px var(--red-glow); }
+
+/* ── Game over ── */
+#game-over {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(15,23,42,0.96);
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+  backdrop-filter: blur(10px);
+  text-align: center; padding: 30px;
+  gap: 4px;
+}
+#game-over.visible { display: flex; }
+#game-over h2 {
+  font-size: 2em; font-weight: 900; margin-bottom: 12px;
+  background: linear-gradient(135deg, var(--teal), var(--gold), var(--orange));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+#game-over .summary {
+  color: var(--grey); font-size: 0.95em; line-height: 2.1;
+  margin-bottom: 24px;
+}
+#game-over .summary strong { color: #e2e8f0; }
+#btn-restart {
+  background: linear-gradient(135deg, var(--teal), var(--orange));
+  border: none; color: white; padding: 14px 36px; border-radius: 12px;
+  font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1em;
+  cursor: pointer; transition: transform 0.2s;
+}
+#btn-restart:hover { transform: scale(1.05); }
+
+/* ── Start overlay ── */
+#start-overlay {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(15,23,42,0.97);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  backdrop-filter: blur(10px);
+  text-align: center; padding: 30px; gap: 16px;
+}
+#start-overlay h2 {
+  font-size: 1.9em; font-weight: 900;
+  background: linear-gradient(135deg, var(--teal), var(--gold), var(--orange));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+#start-overlay p {
+  color: var(--grey); font-size: 0.9em;
+  max-width: 380px; line-height: 1.7;
+}
+#start-overlay .rules {
+  background: rgba(30,41,59,0.9);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px; padding: 16px 22px;
+  text-align: left; max-width: 400px;
+  font-size: 0.85em; line-height: 2;
+  color: #cbd5e1;
+}
+#start-overlay .rules span.t { color: var(--teal); font-weight: 800; }
+#start-overlay .rules span.o { color: var(--orange); font-weight: 800; }
+#start-overlay .rules span.g { color: var(--gold); font-weight: 800; }
+#btn-start {
+  background: linear-gradient(135deg, var(--teal), var(--orange));
+  border: none; color: white; padding: 14px 40px; border-radius: 12px;
+  font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1em;
+  cursor: pointer; transition: transform 0.2s;
+}
+#btn-start:hover { transform: scale(1.04); }
+
+@media (min-width: 768px) {
+  #header h1 { font-size: 1.9em; }
+  .phrase-adj  { font-size: 1.65em; }
+  .phrase-word { font-size: 1.65em; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Start overlay ── -->
+<div id="start-overlay">
+  <h2>⚡ Error Correction Blitz</h2>
+  <p>A noun phrase appears. One adjective might be in the wrong OSASCOMP position — <em>or the whole thing might be perfect</em>. You decide.</p>
+  <div class="rules">
+    <span class="t">Click the misplaced adjective</span> to flag the error<br>
+    <span class="t">Click "✓ Looks right!"</span> if the order is perfect<br>
+    <span class="o">Wrong answer</span> resets your streak<br>
+    <span class="g">Streak bonus</span> — consecutive correct answers score more<br>
+    <span class="g">Stopwatch</span> — race your classmates for the fastest time
+  </div>
+  <button id="btn-start">▶ Start</button>
+</div>
+
+<!-- ── Main app ── -->
+<div id="app">
+  <div id="header">
+    <div class="label">CYE · OSASCOMP · GEII Year 2</div>
+    <h1>⚡ Error Correction Blitz</h1>
+    <div class="subtitle">Find the intruder — or confirm it's already perfect</div>
+  </div>
+
+  <div id="hud">
+    <span class="hud-score">Score: <span id="score-val">0</span></span>
+    <span id="streak-wrap">🔥 <span id="streak-badge">0</span></span>
+    <span class="hud-round"><span id="round-cur">1</span>/<span id="round-tot">16</span></span>
+    <span class="hud-timer">⏱ <span id="timer-val">0:00</span></span>
+  </div>
+
+  <div id="progress-bar"><div id="progress-fill"></div></div>
+
+  <div id="game-card">
+    <div id="instruction">Click the misplaced adjective · or "✓ Looks right!" if the order is perfect</div>
+    <div id="phrase-display"></div>
+    <button id="btn-correct">✓ Looks right!</button>
+  </div>
+
+  <div id="reveal-panel">
+    <div id="reveal-phrase"></div>
+    <div id="reveal-hint"></div>
+    <button id="btn-next">Next →</button>
+  </div>
+</div>
+
+<div id="feedback"></div>
+<div id="milestone-toast"></div>
+
+<div id="game-over">
+  <h2>Blitz Complete! ⚡</h2>
+  <div class="summary" id="go-summary"></div>
+  <button id="btn-restart">↺ Play again</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  Audio (Web Audio API — same approach as Category Drop)
+// ═══════════════════════════════════════════════════════════════
+let audioCtx = null;
+function getCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function beep(freq, type, vol, dur, start) {
+  const ctx = getCtx();
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.connect(g); g.connect(ctx.destination);
+  o.type = type; o.frequency.setValueAtTime(freq, start);
+  g.gain.setValueAtTime(vol, start);
+  g.gain.linearRampToValueAtTime(0, start + dur);
+  o.start(start); o.stop(start + dur + 0.01);
+}
+function playCorrect() {
+  const t = getCtx().currentTime;
+  beep(440, 'sine', 0.13, 0.22, t);
+  beep(660, 'sine', 0.13, 0.22, t + 0.14);
+}
+function playWrong() {
+  const t = getCtx().currentTime;
+  beep(180, 'sawtooth', 0.09, 0.28, t);
+}
+function playMilestone() {
+  const t = getCtx().currentTime;
+  [523, 659, 784].forEach((f, i) => beep(f, 'sine', 0.1, 0.25, t + i * 0.1));
+}
+function playWin() {
+  const t = getCtx().currentTime;
+  [523, 659, 784, 1047].forEach((f, i) => beep(f, 'sine', 0.11, 0.3, t + i * 0.14));
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Round data
+//  Each round:
+//    tokens  — array of {t: string, adj: bool, error: bool, cat: string}
+//    hasError — true = one adjective is misplaced; false = order is perfect
+//    correct  — the correct phrase as a string
+//    hint     — OSASCOMP explanation shown after answer
+// ═══════════════════════════════════════════════════════════════
+const ROUNDS = [
+
+  // ── Rounds WITH an error (click the misplaced adjective) ──
+
+  {
+    tokens: [
+      {t:'a',adj:false}, {t:'Japanese',adj:true,error:true,cat:'Origin'},
+      {t:'sleek',adj:true,error:false,cat:'Opinion'}, {t:'wireless',adj:true,error:false,cat:'Purpose'},
+      {t:'drone',adj:false}
+    ],
+    hasError: true,
+    correct: 'a sleek Japanese wireless drone',
+    hint: 'Opinion → Origin → Purpose  ·  sleek (Op) · Japanese (Ori) · wireless (P)'
+  },
+  {
+    tokens: [
+      {t:'a',adj:false}, {t:'circular',adj:true,error:true,cat:'Shape'},
+      {t:'small',adj:true,error:false,cat:'Size'}, {t:'grey',adj:true,error:false,cat:'Colour'},
+      {t:'screen',adj:false}
+    ],
+    hasError: true,
+    correct: 'a small circular grey screen',
+    hint: 'Size → Shape → Colour  ·  small (S) · circular (Sh) · grey (C)'
+  },
+  {
+    tokens: [
+      {t:'a',adj:false}, {t:'carbon-fibre',adj:true,error:true,cat:'Material'},
+      {t:'modern',adj:true,error:false,cat:'Age'}, {t:'Japanese',adj:true,error:false,cat:'Origin'},
+      {t:'sensor',adj:false}
+    ],
+    hasError: true,
+    correct: 'a modern Japanese carbon-fibre sensor',
+    hint: 'Age → Origin → Material  ·  modern (A) · Japanese (Ori) · carbon-fibre (M)'
+  },
+  {
+    tokens: [
+      {t:'a',adj:false}, {t:'huge',adj:true,error:false,cat:'Size'},
+      {t:'transparent',adj:true,error:true,cat:'Colour'}, {t:'old',adj:true,error:false,cat:'Age'},
+      {t:'visor',adj:false}
+    ],
+    hasError: true,
+    correct: 'a huge old transparent visor',
+    hint: 'Size → Age → Colour  ·  huge (S) · old (A) · transparent (C)'
+  },
+  {
+    tokens: [
+      {t:'a',adj:false}, {t:'touch-sensitive',adj:true,error:true,cat:'Purpose'},
+      {t:'lightweight',adj:true,error:false,cat:'Size'}, {t:'organic',adj:true,error:false,cat:'Material'},
+      {t:'patch',adj:false}
+    ],
+    hasError: true,
+    correct: 'a lightweight organic touch-sensitive patch',
+    hint: 'Size → Material → Purpose  ·  lightweight (S) · organic (M) · touch-sensitive (P)'
+  },
+  {
+    tokens: [
+      {t:'a',adj:false}, {t:'real-time',adj:true,error:true,cat:'Age'},
+      {t:'sophisticated',adj:true,error:false,cat:'Opinion'}, {t:'algorithmic',adj:true,error:false,cat:'Purpose'},
+      {t:'chip',adj:false}
+    ],
+    hasError: true,
+    correct: 'a sophisticated real-time algorithmic chip',
+    hint: 'Opinion → Age → Purpose  ·  sophisticated (Op) · real-time (A) · algorithmic (P)'
+  },
+  {
+    tokens: [
+      {t:'a',adj:false}, {t:'beautiful',adj:true,error:false,cat:'Opinion'},
+      {t:'old-fashioned',adj:true,error:true,cat:'Age'}, {t:'tiny',adj:true,error:false,cat:'Size'},
+      {t:'gadget',adj:false}
+    ],
+    hasError: true,
+    correct: 'a beautiful tiny old-fashioned gadget',
+    hint: 'Opinion → Size → Age  ·  beautiful (Op) · tiny (S) · old-fashioned (A)'
+  },
+  {
+    tokens: [
+      {t:'a',adj:false}, {t:'wireless',adj:true,error:true,cat:'Purpose'},
+      {t:'rectangular',adj:true,error:false,cat:'Shape'}, {t:'glass',adj:true,error:false,cat:'Material'},
+      {t:'screen',adj:false}
+    ],
+    hasError: true,
+    correct: 'a rectangular glass wireless screen',
+    hint: 'Shape → Material → Purpose  ·  rectangular (Sh) · glass (M) · wireless (P)'
+  },
+  {
+    tokens: [
+      {t:'a',adj:false}, {t:'Scandinavian-designed',adj:true,error:true,cat:'Origin'},
+      {t:'minimalist',adj:true,error:false,cat:'Opinion'}, {t:'carbon-fibre',adj:true,error:false,cat:'Material'},
+      {t:'earpiece',adj:false}
+    ],
+    hasError: true,
+    correct: 'a minimalist Scandinavian-designed carbon-fibre earpiece',
+    hint: 'Opinion → Origin → Material  ·  minimalist (Op) · Scandinavian-designed (Ori) · carbon-fibre (M)'
+  },
+  {
+    tokens: [
+      {t:'a',adj:false}, {t:'square',adj:true,error:true,cat:'Shape'},
+      {t:'heavy',adj:true,error:false,cat:'Size'}, {t:'plastic',adj:true,error:false,cat:'Material'},
+      {t:'TV',adj:false}
+    ],
+    hasError: true,
+    correct: 'a heavy square plastic TV',
+    hint: 'Size → Shape → Material  ·  heavy (S) · square (Sh) · plastic (M)'
+  },
+
+  // ── Rounds WITHOUT errors (click "✓ Looks right!") ──
+
+  {
+    tokens: [
+      {t:'a',adj:false}, {t:'sleek',adj:true,error:false,cat:'Opinion'},
+      {t:'lightweight',adj:true,error:false,cat:'Size'}, {t:'wireless',adj:true,error:false,cat:'Purpose'},
+      {t:'drone',adj:false}
+    ],
+    hasError: false,
+    correct: 'a sleek lightweight wireless drone',
+    hint: 'Opinion → Size → Purpose — perfect order! ✓'
+  },
+  {
+    tokens: [
+      {t:'a',adj:false}, {t:'beautiful',adj:true,error:false,cat:'Opinion'},
+      {t:'tiny',adj:true,error:false,cat:'Size'}, {t:'old-fashioned',adj:true,error:false,cat:'Age'},
+      {t:'robot',adj:false}
+    ],
+    hasError: false,
+    correct: 'a beautiful tiny old-fashioned robot',
+    hint: 'Opinion → Size → Age — perfect order! ✓'
+  },
+  {
+    tokens: [
+      {t:'a',adj:false}, {t:'small',adj:true,error:false,cat:'Size'},
+      {t:'circular',adj:true,error:false,cat:'Shape'}, {t:'grey',adj:true,error:false,cat:'Colour'},
+      {t:'lens',adj:false}
+    ],
+    hasError: false,
+    correct: 'a small circular grey lens',
+    hint: 'Size → Shape → Colour — perfect order! ✓'
+  },
+  {
+    tokens: [
+      {t:'a',adj:false}, {t:'modern',adj:true,error:false,cat:'Age'},
+      {t:'Japanese',adj:true,error:false,cat:'Origin'}, {t:'carbon-fibre',adj:true,error:false,cat:'Material'},
+      {t:'implant',adj:false}
+    ],
+    hasError: false,
+    correct: 'a modern Japanese carbon-fibre implant',
+    hint: 'Age → Origin → Material — perfect order! ✓'
+  },
+  {
+    tokens: [
+      {t:'a',adj:false}, {t:'sophisticated',adj:true,error:false,cat:'Opinion'},
+      {t:'real-time',adj:true,error:false,cat:'Age'}, {t:'algorithmic',adj:true,error:false,cat:'Purpose'},
+      {t:'system',adj:false}
+    ],
+    hasError: false,
+    correct: 'a sophisticated real-time algorithmic system',
+    hint: 'Opinion → Age → Purpose — perfect order! ✓'
+  },
+  {
+    tokens: [
+      {t:'a',adj:false}, {t:'holographic',adj:true,error:false,cat:'Opinion'},
+      {t:'3D',adj:true,error:false,cat:'Shape'}, {t:'digital',adj:true,error:false,cat:'Purpose'},
+      {t:'interface',adj:false}
+    ],
+    hasError: false,
+    correct: 'a holographic 3D digital interface',
+    hint: 'Opinion → Shape → Purpose — perfect order! ✓'
+  }
+];
+
+// ═══════════════════════════════════════════════════════════════
+//  State
+// ═══════════════════════════════════════════════════════════════
+let rounds, currentRound, score, streak, maxStreak, answered;
+let stopwatchInterval, stopwatchMs = 0;
+
+const MILESTONES = [
+  { streak: 3,  msg: '🔥 3 in a row! +bonus' },
+  { streak: 5,  msg: '⚡ 5 in a row! +bonus' },
+  { streak: 8,  msg: '🏆 OSASCOMP MASTER! +bonus' },
+];
+
+// ═══════════════════════════════════════════════════════════════
+//  Helpers
+// ═══════════════════════════════════════════════════════════════
+function $(id) { return document.getElementById(id); }
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function showFeedback(text, type) {
+  const el = $('feedback');
+  el.textContent = text;
+  el.className = `visible ${type}`;
+  setTimeout(() => { el.className = ''; }, 950);
+}
+
+function updateHUD() {
+  $('score-val').textContent = score;
+  $('round-cur').textContent = currentRound + 1;
+  $('progress-fill').style.width = `${(currentRound / rounds.length) * 100}%`;
+  const badge = $('streak-badge');
+  badge.textContent = streak;
+}
+
+function bumpStreak() {
+  const badge = $('streak-badge');
+  badge.classList.remove('bump');
+  void badge.offsetWidth;
+  badge.classList.add('bump');
+}
+
+function showMilestone(msg) {
+  const el = $('milestone-toast');
+  el.textContent = msg;
+  el.classList.remove('visible');
+  void el.offsetWidth;
+  el.classList.add('visible');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Stopwatch
+// ═══════════════════════════════════════════════════════════════
+function formatTime(ms) {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function startStopwatch() {
+  stopwatchMs = 0;
+  $('timer-val').textContent = '0:00';
+  if (stopwatchInterval) clearInterval(stopwatchInterval);
+  const start = Date.now();
+  stopwatchInterval = setInterval(() => {
+    stopwatchMs = Date.now() - start;
+    $('timer-val').textContent = formatTime(stopwatchMs);
+  }, 500);
+}
+
+function stopStopwatch() {
+  clearInterval(stopwatchInterval);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Round lifecycle
+// ═══════════════════════════════════════════════════════════════
+function loadRound() {
+  if (currentRound >= rounds.length) { endGame(); return; }
+  const round = rounds[currentRound];
+  answered = false;
+
+  $('reveal-panel').classList.remove('visible');
+  $('btn-next').disabled = true;
+
+  const display = $('phrase-display');
+  display.innerHTML = '';
+
+  round.tokens.forEach(token => {
+    if (token.adj) {
+      const btn = document.createElement('button');
+      btn.className = 'phrase-adj';
+      btn.textContent = token.t;
+      btn.addEventListener('click', () => onAdjClick(btn, token, round));
+      display.appendChild(btn);
+    } else {
+      const span = document.createElement('span');
+      span.className = 'phrase-word';
+      span.textContent = token.t;
+      display.appendChild(span);
+    }
+  });
+
+  updateHUD();
+}
+
+function onAdjClick(btn, token, round) {
+  if (answered) return;
+  answered = true;
+
+  if (round.hasError && token.error) {
+    handleCorrect(round);
+    btn.classList.add('flash-correct');
+    showFeedback('✓ Found it!', 'correct');
+  } else {
+    handleWrong(round);
+    btn.classList.add('flash-wrong');
+    const msg = round.hasError ? '✗ Wrong adjective!' : '✗ No error here!';
+    showFeedback(msg, 'wrong');
+    revealError(round);
+  }
+
+  showReveal(round);
+}
+
+function onLooksRight(round) {
+  if (answered) return;
+  answered = true;
+
+  if (!round.hasError) {
+    handleCorrect(round);
+    showFeedback('✓ Perfect order!', 'correct');
+  } else {
+    handleWrong(round);
+    showFeedback('✗ There is an error!', 'wrong');
+    revealError(round);
+  }
+
+  showReveal(round);
+}
+
+function handleCorrect(round) {
+  const bonus = Math.min(streak * 2, 20);
+  score += 10 + bonus;
+  streak++;
+  if (streak > maxStreak) maxStreak = streak;
+  playCorrect();
+  bumpStreak();
+  updateHUD();
+  const milestone = MILESTONES.find(m => m.streak === streak);
+  if (milestone) {
+    playMilestone();
+    setTimeout(() => showMilestone(milestone.msg), 400);
+  }
+}
+
+function handleWrong(round) {
+  score = Math.max(0, score - 5);
+  streak = 0;
+  updateHUD();
+}
+
+function revealError(round) {
+  if (!round.hasError) return;
+  const adjBtns = $('phrase-display').querySelectorAll('.phrase-adj');
+  const adjTokens = round.tokens.filter(t => t.adj);
+  adjTokens.forEach((t, i) => {
+    if (t.error) {
+      setTimeout(() => adjBtns[i].classList.add('flash-correct'), 450);
+    }
+  });
+}
+
+function showReveal(round) {
+  $('reveal-phrase').textContent = '✓ ' + round.correct;
+  $('reveal-hint').textContent = round.hint;
+  $('reveal-panel').classList.add('visible');
+  setTimeout(() => { $('btn-next').disabled = false; }, 300);
+}
+
+function nextRound() {
+  currentRound++;
+  loadRound();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  End game
+// ═══════════════════════════════════════════════════════════════
+function endGame() {
+  stopStopwatch();
+  $('progress-fill').style.width = '100%';
+  playWin();
+  $('go-summary').innerHTML =
+    `Final score: <strong>${score}</strong><br>` +
+    `Time: <strong>${formatTime(stopwatchMs)}</strong><br>` +
+    `Best streak: <strong>${maxStreak}</strong>`;
+  $('game-over').classList.add('visible');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Init
+// ═══════════════════════════════════════════════════════════════
+function init() {
+  rounds = shuffle([...ROUNDS]);
+  currentRound = 0;
+  score = 0;
+  streak = 0;
+  maxStreak = 0;
+  $('round-tot').textContent = rounds.length;
+  $('game-over').classList.remove('visible');
+  $('reveal-panel').classList.remove('visible');
+  updateHUD();
+  startStopwatch();
+  loadRound();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Event listeners
+// ═══════════════════════════════════════════════════════════════
+$('btn-start').addEventListener('click', () => {
+  $('start-overlay').style.display = 'none';
+  init();
+});
+
+$('btn-correct').addEventListener('click', () => {
+  if (!answered && rounds) onLooksRight(rounds[currentRound]);
+});
+
+$('btn-next').addEventListener('click', () => {
+  if (!$('btn-next').disabled) nextRound();
+});
+
+$('btn-restart').addEventListener('click', () => {
+  $('game-over').classList.remove('visible');
+  init();
+});
+
+document.addEventListener('keydown', e => {
+  if (!rounds) return;
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    if (answered) { if (!$('btn-next').disabled) nextRound(); }
+    else onLooksRight(rounds[currentRound]);
+  }
+});
+</script>
+</body>
+</html>
