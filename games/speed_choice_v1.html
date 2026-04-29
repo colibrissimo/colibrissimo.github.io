@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>CYE · OSASCOMP · Speed Choice</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --teal: #0891b2;
+  --teal-glow: rgba(8,145,178,0.3);
+  --orange: #f97316;
+  --orange-glow: rgba(249,115,22,0.3);
+  --gold: #ffd700;
+  --gold-glow: rgba(255,215,0,0.3);
+  --dark: #0f172a;
+  --card-bg: #1e293b;
+  --grey: #94a3b8;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; min-height: 100%;
+  background: var(--dark);
+  font-family: 'Nunito', sans-serif;
+  color: #e2e8f0;
+  user-select: none; -webkit-user-select: none;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 25%, var(--teal-glow) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 75%, var(--orange-glow) 0%, transparent 50%);
+  pointer-events: none; z-index: 0;
+}
+
+/* ── Layout ── */
+#app {
+  position: relative; z-index: 1;
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center;
+  padding: 0 16px 48px;
+}
+
+/* ── Header ── */
+#header { width: 100%; text-align: center; padding: 18px 0 8px; }
+#header .label {
+  font-size: 0.62em; letter-spacing: 0.22em;
+  color: var(--grey); text-transform: uppercase;
+}
+#header h1 {
+  font-size: 1.5em; font-weight: 900; margin: 4px 0 2px;
+  background: linear-gradient(135deg, var(--teal), var(--gold), var(--orange));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+#header .subtitle { font-size: 0.78em; color: var(--grey); }
+
+/* ── HUD ── */
+#hud {
+  display: flex; gap: 20px; align-items: center;
+  font-size: 0.8em; font-weight: 700;
+  margin-bottom: 14px;
+}
+#hud .hud-streak { color: var(--gold); }
+#hud .hud-timer  { color: var(--teal); font-variant-numeric: tabular-nums; }
+#hud .hud-round  { color: var(--grey); }
+
+#streak-badge {
+  display: inline-block; min-width: 28px; text-align: center;
+  padding: 2px 8px; border-radius: 6px;
+  background: rgba(255,215,0,0.12);
+  border: 1px solid rgba(255,215,0,0.25);
+  font-variant-numeric: tabular-nums;
+}
+#streak-badge.bump { animation: streakBump 0.3s ease; }
+@keyframes streakBump {
+  0% { transform: scale(1); } 50% { transform: scale(1.45); } 100% { transform: scale(1); }
+}
+
+/* ── Progress bar ── */
+#progress-bar {
+  width: 100%; max-width: 640px;
+  height: 3px; background: rgba(255,255,255,0.08);
+  border-radius: 2px; margin-bottom: 20px; overflow: hidden;
+}
+#progress-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--orange), var(--gold), var(--teal));
+  border-radius: 2px; transition: width 0.35s ease;
+}
+
+/* ── Choice arena ── */
+#arena {
+  width: 100%; max-width: 640px;
+  display: flex; gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.choice-card {
+  flex: 1 1 260px;
+  background: rgba(30,41,59,0.9);
+  border: 2px solid rgba(255,255,255,0.1);
+  border-radius: 18px;
+  padding: 28px 20px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 1.2em; font-weight: 800;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  color: #e2e8f0;
+  transition: border-color 0.15s, background 0.15s, transform 0.12s;
+  min-height: 110px;
+  display: flex; align-items: center; justify-content: center;
+}
+.choice-card:hover {
+  border-color: var(--teal);
+  background: rgba(8,145,178,0.1);
+  transform: translateY(-3px);
+}
+.choice-card:active { transform: translateY(0); }
+
+.choice-card.flash-correct {
+  border-color: var(--teal) !important;
+  background: rgba(8,145,178,0.22) !important;
+  color: var(--teal) !important;
+  animation: cardCorrect 0.5s ease;
+}
+.choice-card.flash-wrong {
+  border-color: var(--orange) !important;
+  background: rgba(249,115,22,0.18) !important;
+  color: var(--orange) !important;
+  animation: cardWrong 0.45s ease;
+}
+.choice-card.reveal-correct {
+  border-color: var(--teal) !important;
+  background: rgba(8,145,178,0.16) !important;
+  color: var(--teal) !important;
+}
+
+@keyframes cardCorrect {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+@keyframes cardWrong {
+  0%,100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-5px); }
+  80% { transform: translateX(5px); }
+}
+
+/* ── Feedback ── */
+#feedback {
+  position: fixed; top: 44%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 30; font-size: 1.8em; font-weight: 900;
+  pointer-events: none; opacity: 0; transition: opacity 0.2s;
+  text-align: center; white-space: nowrap;
+}
+#feedback.visible { opacity: 1; }
+#feedback.correct { color: var(--teal); text-shadow: 0 0 30px var(--teal-glow); }
+#feedback.wrong   { color: var(--orange); text-shadow: 0 0 30px var(--orange-glow); }
+
+/* ── Milestone toast ── */
+#milestone-toast {
+  position: fixed; top: 20%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 35; font-size: 1.3em; font-weight: 900;
+  pointer-events: none; opacity: 0;
+  color: var(--gold); text-shadow: 0 0 30px var(--gold-glow);
+  white-space: nowrap; text-align: center;
+}
+#milestone-toast.visible { animation: milestoneAnim 1.4s ease forwards; }
+@keyframes milestoneAnim {
+  0%   { opacity: 0; transform: translate(-50%,-50%) scale(0.7); }
+  20%  { opacity: 1; transform: translate(-50%,-50%) scale(1.1); }
+  70%  { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%,-62%) scale(1); }
+}
+
+/* ── End / Win overlay ── */
+#end-screen {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(15,23,42,0.96);
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+  backdrop-filter: blur(10px);
+  text-align: center; padding: 30px; gap: 8px;
+}
+#end-screen.visible { display: flex; }
+#end-screen h2 {
+  font-size: 2em; font-weight: 900; margin-bottom: 10px;
+  background: linear-gradient(135deg, var(--teal), var(--gold), var(--orange));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+#end-screen .summary {
+  color: var(--grey); font-size: 0.95em; line-height: 2.2; margin-bottom: 8px;
+}
+#end-screen .summary strong { color: #e2e8f0; }
+#end-screen .correct-was {
+  font-size: 0.88em; color: var(--teal);
+  background: rgba(8,145,178,0.12);
+  border: 1px solid rgba(8,145,178,0.25);
+  border-radius: 10px; padding: 10px 18px;
+  margin-bottom: 18px; max-width: 480px;
+  line-height: 1.6;
+}
+#end-screen .correct-was .hint { color: var(--grey); font-size: 0.85em; margin-top: 4px; }
+#btn-again {
+  background: linear-gradient(135deg, var(--teal), var(--orange));
+  border: none; color: white; padding: 14px 40px; border-radius: 12px;
+  font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1em;
+  cursor: pointer; transition: transform 0.2s;
+}
+#btn-again:hover { transform: scale(1.05); }
+
+/* ── Start overlay ── */
+#start-overlay {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(15,23,42,0.97);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  backdrop-filter: blur(10px);
+  text-align: center; padding: 30px; gap: 18px;
+}
+#start-overlay h2 {
+  font-size: 1.9em; font-weight: 900;
+  background: linear-gradient(135deg, var(--teal), var(--gold), var(--orange));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+#start-overlay p { color: var(--grey); font-size: 0.9em; max-width: 360px; line-height: 1.7; }
+#start-overlay .rules {
+  background: rgba(30,41,59,0.9);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px; padding: 16px 22px;
+  text-align: left; max-width: 380px;
+  font-size: 0.85em; line-height: 2; color: #cbd5e1;
+}
+#start-overlay .rules span.t { color: var(--teal); font-weight: 800; }
+#start-overlay .rules span.o { color: var(--orange); font-weight: 800; }
+#start-overlay .rules span.g { color: var(--gold); font-weight: 800; }
+#btn-start {
+  background: linear-gradient(135deg, var(--teal), var(--orange));
+  border: none; color: white; padding: 14px 44px; border-radius: 12px;
+  font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1.05em;
+  cursor: pointer; transition: transform 0.2s;
+}
+#btn-start:hover { transform: scale(1.04); }
+
+@media (min-width: 600px) {
+  #header h1 { font-size: 1.9em; }
+  .choice-card { font-size: 1.3em; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Start overlay ── -->
+<div id="start-overlay">
+  <h2>⚡ Speed Choice</h2>
+  <p>Two noun phrases. One is correctly ordered. Click the right one — fast.</p>
+  <div class="rules">
+    <span class="t">Click the correctly ordered phrase</span><br>
+    <span class="g">One wrong answer</span> — streak dies, game over<br>
+    <span class="g">Stopwatch</span> running — race yourself and each other<br>
+    <span class="o">Perfect run?</span> Your time is your score
+  </div>
+  <button id="btn-start">▶ Start</button>
+</div>
+
+<!-- ── Main app ── -->
+<div id="app">
+  <div id="header">
+    <div class="label">CYE · OSASCOMP · GEII Year 2</div>
+    <h1>⚡ Speed Choice</h1>
+    <div class="subtitle">Click the correctly ordered noun phrase</div>
+  </div>
+
+  <div id="hud">
+    <span class="hud-streak">🔥 <span id="streak-badge">0</span></span>
+    <span class="hud-timer">⏱ <span id="timer-val">0:00</span></span>
+    <span class="hud-round"><span id="round-cur">1</span> / <span id="round-tot">20</span></span>
+  </div>
+
+  <div id="progress-bar"><div id="progress-fill"></div></div>
+
+  <div id="arena">
+    <button class="choice-card" id="card-a"></button>
+    <button class="choice-card" id="card-b"></button>
+  </div>
+</div>
+
+<div id="feedback"></div>
+<div id="milestone-toast"></div>
+
+<div id="end-screen">
+  <h2 id="end-title"></h2>
+  <div class="summary" id="end-summary"></div>
+  <div class="correct-was" id="end-correct" style="display:none">
+    <div id="end-correct-phrase"></div>
+    <div class="hint" id="end-correct-hint"></div>
+  </div>
+  <button id="btn-again">↺ Try again</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  Audio
+// ═══════════════════════════════════════════════════════════════
+let audioCtx = null;
+function getCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function beep(freq, type, vol, dur, start) {
+  const ctx = getCtx();
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.connect(g); g.connect(ctx.destination);
+  o.type = type; o.frequency.setValueAtTime(freq, start);
+  g.gain.setValueAtTime(vol, start);
+  g.gain.linearRampToValueAtTime(0, start + dur);
+  o.start(start); o.stop(start + dur + 0.01);
+}
+function playCorrect() {
+  const t = getCtx().currentTime;
+  beep(440, 'sine', 0.12, 0.18, t);
+  beep(660, 'sine', 0.12, 0.18, t + 0.12);
+}
+function playWrong() {
+  const t = getCtx().currentTime;
+  beep(180, 'sawtooth', 0.1, 0.3, t);
+}
+function playMilestone() {
+  const t = getCtx().currentTime;
+  [523, 659, 784].forEach((f, i) => beep(f, 'sine', 0.1, 0.22, t + i * 0.1));
+}
+function playWin() {
+  const t = getCtx().currentTime;
+  [523, 659, 784, 1047].forEach((f, i) => beep(f, 'sine', 0.11, 0.28, t + i * 0.13));
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Data  — { correct, wrong, hint }
+//  correct = the properly ordered phrase
+//  wrong   = same phrase with one adjacent-category swap
+// ═══════════════════════════════════════════════════════════════
+const PAIRS = [
+  {
+    correct: 'a sleek small wireless device',
+    wrong:   'a small sleek wireless device',
+    hint:    'Opinion → Size → Purpose'
+  },
+  {
+    correct: 'a modern Japanese carbon-fibre robot',
+    wrong:   'a Japanese modern carbon-fibre robot',
+    hint:    'Age → Origin → Material'
+  },
+  {
+    correct: 'a small circular grey lens',
+    wrong:   'a circular small grey lens',
+    hint:    'Size → Shape → Colour'
+  },
+  {
+    correct: 'a beautiful tiny old-fashioned gadget',
+    wrong:   'a beautiful old-fashioned tiny gadget',
+    hint:    'Opinion → Size → Age'
+  },
+  {
+    correct: 'a sleek Japanese wireless drone',
+    wrong:   'a Japanese sleek wireless drone',
+    hint:    'Opinion → Origin → Purpose'
+  },
+  {
+    correct: 'a sophisticated real-time algorithmic chip',
+    wrong:   'a real-time sophisticated algorithmic chip',
+    hint:    'Opinion → Age → Purpose'
+  },
+  {
+    correct: 'a heavy square plastic TV',
+    wrong:   'a square heavy plastic TV',
+    hint:    'Size → Shape → Material'
+  },
+  {
+    correct: 'a lightweight organic touch-sensitive patch',
+    wrong:   'an organic lightweight touch-sensitive patch',
+    hint:    'Size → Material → Purpose'
+  },
+  {
+    correct: 'a huge old transparent visor',
+    wrong:   'a huge transparent old visor',
+    hint:    'Size → Age → Colour'
+  },
+  {
+    correct: 'a rectangular glass wireless screen',
+    wrong:   'a glass rectangular wireless screen',
+    hint:    'Shape → Material → Purpose'
+  },
+  {
+    correct: 'a minimalist Scandinavian-designed carbon-fibre earpiece',
+    wrong:   'a Scandinavian-designed minimalist carbon-fibre earpiece',
+    hint:    'Opinion → Origin → Material'
+  },
+  {
+    correct: 'a holographic 3D digital interface',
+    wrong:   'a 3D holographic digital interface',
+    hint:    'Opinion → Shape → Purpose'
+  },
+  {
+    correct: 'a clumsy old-fashioned plastic remote',
+    wrong:   'an old-fashioned clumsy plastic remote',
+    hint:    'Opinion → Age → Material'
+  },
+  {
+    correct: 'a tiny rectangular transparent lens',
+    wrong:   'a tiny transparent rectangular lens',
+    hint:    'Size → Shape → Colour'
+  },
+  {
+    correct: 'a beautiful modern glass building',
+    wrong:   'a modern beautiful glass building',
+    hint:    'Opinion → Age → Material'
+  },
+  {
+    correct: 'a lightweight Japanese carbon-fibre frame',
+    wrong:   'a Japanese lightweight carbon-fibre frame',
+    hint:    'Size → Origin → Material'
+  },
+  {
+    correct: 'a huge circular transparent screen',
+    wrong:   'a circular huge transparent screen',
+    hint:    'Size → Shape → Colour'
+  },
+  {
+    correct: 'a sophisticated Japanese wireless device',
+    wrong:   'a sophisticated wireless Japanese device',
+    hint:    'Opinion → Origin → Purpose'
+  },
+  {
+    correct: 'a small old-fashioned grey sensor',
+    wrong:   'a small grey old-fashioned sensor',
+    hint:    'Size → Age → Colour'
+  },
+  {
+    correct: 'a revolutionary lightweight touch-sensitive implant',
+    wrong:   'a lightweight revolutionary touch-sensitive implant',
+    hint:    'Opinion → Size → Purpose'
+  }
+];
+
+const MILESTONES = [
+  { at: 5,  msg: '🔥 5 in a row!' },
+  { at: 10, msg: '⚡ Halfway — still clean!' },
+  { at: 15, msg: '🏆 15 in a row!' },
+];
+
+// ═══════════════════════════════════════════════════════════════
+//  State
+// ═══════════════════════════════════════════════════════════════
+let rounds, currentRound, streak, live;
+let stopwatchInterval, stopwatchMs = 0;
+
+// ═══════════════════════════════════════════════════════════════
+//  Helpers
+// ═══════════════════════════════════════════════════════════════
+function $(id) { return document.getElementById(id); }
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function formatTime(ms) {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function showFeedback(text, type) {
+  const el = $('feedback');
+  el.textContent = text; el.className = `visible ${type}`;
+  setTimeout(() => { el.className = ''; }, 700);
+}
+
+function bumpStreak() {
+  const b = $('streak-badge');
+  b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump');
+}
+
+function showMilestone(msg) {
+  const el = $('milestone-toast');
+  el.textContent = msg;
+  el.classList.remove('visible'); void el.offsetWidth; el.classList.add('visible');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Stopwatch
+// ═══════════════════════════════════════════════════════════════
+function startStopwatch() {
+  stopwatchMs = 0;
+  $('timer-val').textContent = '0:00';
+  if (stopwatchInterval) clearInterval(stopwatchInterval);
+  const start = Date.now();
+  stopwatchInterval = setInterval(() => {
+    stopwatchMs = Date.now() - start;
+    $('timer-val').textContent = formatTime(stopwatchMs);
+  }, 500);
+}
+function stopStopwatch() { clearInterval(stopwatchInterval); }
+
+// ═══════════════════════════════════════════════════════════════
+//  Round
+// ═══════════════════════════════════════════════════════════════
+function loadRound() {
+  if (currentRound >= rounds.length) { endGame(true); return; }
+  const pair = rounds[currentRound];
+
+  // Randomly assign correct/wrong to card A or B
+  const correctIsA = Math.random() < 0.5;
+  const cardA = $('card-a');
+  const cardB = $('card-b');
+
+  cardA.textContent = correctIsA ? pair.correct : pair.wrong;
+  cardB.textContent = correctIsA ? pair.wrong   : pair.correct;
+  cardA.dataset.isCorrect = correctIsA ? '1' : '0';
+  cardB.dataset.isCorrect = correctIsA ? '0' : '1';
+
+  cardA.className = 'choice-card';
+  cardB.className = 'choice-card';
+
+  $('round-cur').textContent = currentRound + 1;
+  $('progress-fill').style.width = `${(currentRound / rounds.length) * 100}%`;
+  $('streak-badge').textContent = streak;
+
+  live = true;
+}
+
+function onChoice(card, isCorrect) {
+  if (!live) return;
+  live = false;
+
+  if (isCorrect) {
+    card.classList.add('flash-correct');
+    streak++;
+    $('streak-badge').textContent = streak;
+    bumpStreak();
+    playCorrect();
+    showFeedback('✓', 'correct');
+
+    const milestone = MILESTONES.find(m => m.at === streak);
+    if (milestone) { playMilestone(); setTimeout(() => showMilestone(milestone.msg), 350); }
+
+    setTimeout(() => { currentRound++; loadRound(); }, 580);
+  } else {
+    card.classList.add('flash-wrong');
+    // Reveal which was correct
+    const other = card.id === 'card-a' ? $('card-b') : $('card-a');
+    setTimeout(() => other.classList.add('reveal-correct'), 200);
+    playWrong();
+    showFeedback('✗', 'wrong');
+    setTimeout(() => endGame(false), 1100);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  End game
+// ═══════════════════════════════════════════════════════════════
+function endGame(won) {
+  stopStopwatch();
+  $('progress-fill').style.width = won ? '100%' : $('progress-fill').style.width;
+
+  if (won) {
+    playWin();
+    $('end-title').textContent = '⚡ Perfect run!';
+    $('end-summary').innerHTML =
+      `Time: <strong>${formatTime(stopwatchMs)}</strong><br>` +
+      `All <strong>${rounds.length}</strong> phrases correct`;
+    $('end-correct').style.display = 'none';
+  } else {
+    const pair = rounds[currentRound];
+    $('end-title').textContent = '💥 Streak broken!';
+    $('end-summary').innerHTML =
+      `Streak: <strong>${streak}</strong> / ${rounds.length}<br>` +
+      `Time: <strong>${formatTime(stopwatchMs)}</strong>`;
+    $('end-correct-phrase').textContent = '✓ ' + pair.correct;
+    $('end-correct-hint').textContent = pair.hint;
+    $('end-correct').style.display = 'block';
+  }
+
+  $('end-screen').classList.add('visible');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Init
+// ═══════════════════════════════════════════════════════════════
+function init() {
+  rounds = shuffle([...PAIRS]);
+  currentRound = 0;
+  streak = 0;
+  live = false;
+  $('round-tot').textContent = rounds.length;
+  $('end-screen').classList.remove('visible');
+  startStopwatch();
+  loadRound();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Events
+// ═══════════════════════════════════════════════════════════════
+$('card-a').addEventListener('click', () => onChoice($('card-a'), $('card-a').dataset.isCorrect === '1'));
+$('card-b').addEventListener('click', () => onChoice($('card-b'), $('card-b').dataset.isCorrect === '1'));
+
+$('btn-start').addEventListener('click', () => {
+  $('start-overlay').style.display = 'none';
+  init();
+});
+
+$('btn-again').addEventListener('click', () => {
+  $('end-screen').classList.remove('visible');
+  init();
+});
+
+document.addEventListener('keydown', e => {
+  if (!live) return;
+  if (e.key === 'ArrowLeft'  || e.key === '1') onChoice($('card-a'), $('card-a').dataset.isCorrect === '1');
+  if (e.key === 'ArrowRight' || e.key === '2') onChoice($('card-b'), $('card-b').dataset.isCorrect === '1');
+});
+</script>
+</body>
+</html>
