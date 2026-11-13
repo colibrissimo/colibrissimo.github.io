@@ -284,7 +284,28 @@
   next.addEventListener('click', forward);
   back.addEventListener('click', backward);
   restart.addEventListener('click', () => { step = 0; render(false); window.scrollTo({top:0, behavior:'smooth'}); });
-  answers.forEach(a => a.querySelector('.cover').addEventListener('click', () => a.classList.add('open')));
+  /* ----- which answer did the reader open? -----
+     Each newly opened ending is posted to an ntfy.sh channel; Sarah gets it on her phone.
+     Nothing is sent from localhost, from a file on disk, or when the link ends in #test. */
+  const NTFY = 'https://ntfy.sh/alweo-r3m2z5sranxnodmhzlmtnj';
+  const opened = [];
+  function record(choice){
+    if(opened.includes(choice)) return;
+    opened.push(choice);
+    if(location.protocol === 'file:' || location.hostname === 'localhost' || location.hash === '#test') return;
+    const msg = opened.length === 1 ? `First pick: ${choice}` : `Then also opened: ${choice}`;
+    const tags = choice === 'Yes' ? 'dragon,white_check_mark' : 'dragon,x';
+    try{
+      fetch(`${NTFY}?title=${encodeURIComponent('Alweo comic')}&tags=${tags}`,
+            {method:'POST', body:msg, keepalive:true}).catch(() => {});
+    }catch(_){}
+  }
+  function openAnswer(a){
+    if(a.classList.contains('open')) return;
+    a.classList.add('open');
+    record(a.classList.contains('yes') ? 'Yes' : 'No');
+  }
+  answers.forEach(a => a.querySelector('.cover').addEventListener('click', () => openAnswer(a)));
 
   /* ----- enlarge ----- */
   const lb = document.getElementById('lightbox');
@@ -330,8 +351,8 @@
     if(e.target.closest('button') && (e.key === ' ' || e.key === 'Enter')) return;
     if(e.key === 'ArrowRight' || e.key === ' '){ e.preventDefault(); forward(); }
     if(e.key === 'ArrowLeft'){ e.preventDefault(); backward(); }
-    if(e.key.toLowerCase() === 'y' && isReady()) answers[0].classList.add('open');
-    if(e.key.toLowerCase() === 'n' && isReady()) answers[1].classList.add('open');
+    if(e.key.toLowerCase() === 'y' && isReady()) openAnswer(answers[0]);
+    if(e.key.toLowerCase() === 'n' && isReady()) openAnswer(answers[1]);
   });
 
   render(false);
