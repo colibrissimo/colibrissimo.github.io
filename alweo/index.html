@@ -251,34 +251,39 @@
   const next = document.getElementById('next');
   const back = document.getElementById('back');
   const restart = document.getElementById('restart');
-  let shown = 0; // how many story panels are visible
+  // step 0 = nothing shown, 1-4 = story panels, 5 = answer covers can be opened.
+  // Panel 4 (the question) stays on screen until the reader asks for the answer.
+  const LAST = story.length + 1;
+  let step = 0;
+  const isReady = () => step === LAST;
 
   function render(scroll){
+    const shown = Math.min(step, story.length);
     story.forEach((p,i) => p.classList.toggle('shown', i < shown));
-    const ready = shown === story.length;
+    const ready = isReady();
     answers.forEach(a => {
       a.classList.toggle('ready', ready);
       a.querySelector('.cover').disabled = !ready;
       if(!ready) a.classList.remove('open');
     });
-    back.disabled = shown === 0;
+    back.disabled = step === 0;
     next.disabled = ready;
-    next.textContent = shown === 0 ? 'Start' : 'Next';
+    next.textContent = step === 0 ? 'Start' : step === story.length ? 'His answer?' : 'Next';
     if(scroll){
       const target = ready ? answers[0] : story[shown-1];
-      if(target) target.scrollIntoView({behavior:'smooth', block: ready ? 'end' : 'nearest'});
+      if(target) target.scrollIntoView({behavior:'smooth', block:'nearest'});
     }
   }
 
-  function forward(){ if(shown < story.length){ shown++; render(true); } }
+  function forward(){ if(step < LAST){ step++; render(true); } }
   function backward(){
     if(answers.some(a => a.classList.contains('open'))){ answers.forEach(a => a.classList.remove('open')); return; }
-    if(shown > 0){ shown--; render(false); }
+    if(step > 0){ step--; render(false); }
   }
 
   next.addEventListener('click', forward);
   back.addEventListener('click', backward);
-  restart.addEventListener('click', () => { shown = 0; render(false); window.scrollTo({top:0, behavior:'smooth'}); });
+  restart.addEventListener('click', () => { step = 0; render(false); window.scrollTo({top:0, behavior:'smooth'}); });
   answers.forEach(a => a.querySelector('.cover').addEventListener('click', () => a.classList.add('open')));
 
   /* ----- enlarge ----- */
@@ -325,8 +330,8 @@
     if(e.target.closest('button') && (e.key === ' ' || e.key === 'Enter')) return;
     if(e.key === 'ArrowRight' || e.key === ' '){ e.preventDefault(); forward(); }
     if(e.key === 'ArrowLeft'){ e.preventDefault(); backward(); }
-    if(e.key.toLowerCase() === 'y' && shown === story.length) answers[0].classList.add('open');
-    if(e.key.toLowerCase() === 'n' && shown === story.length) answers[1].classList.add('open');
+    if(e.key.toLowerCase() === 'y' && isReady()) answers[0].classList.add('open');
+    if(e.key.toLowerCase() === 'n' && isReady()) answers[1].classList.add('open');
   });
 
   render(false);
