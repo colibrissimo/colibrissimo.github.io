@@ -1,0 +1,852 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Watercolour Pachinko</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one board fills the screen under a slim strip of controls. The paint is the page; the controls stay quiet. */
+:root{
+  --paper:#eceeea;
+  --ink:#1c1f24;
+  --muted:#5b6169;
+  --pin:#1c1f24;
+  --rule:#c9cdc7;
+  --chip:#f7f8f5;
+  --focus:#2747b5;
+  --blend:multiply;
+  --display:"Bricolage Grotesque","Avenir Next","Segoe UI",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#14161c; --ink:#e6e8ed; --muted:#9aa1ad; --pin:#c9a65a; --rule:#2c303a; --chip:#1c1f27; --focus:#8fb0ff; --blend:screen;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#14161c; --ink:#e6e8ed; --muted:#9aa1ad; --pin:#c9a65a; --rule:#2c303a; --chip:#1c1f27; --focus:#8fb0ff; --blend:screen;
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--mono);display:flex;flex-direction:column;overflow:hidden;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 20px;
+  padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  border-bottom:1px solid var(--rule)}
+.name{min-width:0}
+h1{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:-.01em;margin:0;line-height:1.1}
+.name p{margin:3px 0 0;font-size:12px;color:var(--muted)}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.pigments{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.swatch{width:24px;height:24px;border-radius:50%;border:2px solid var(--paper);box-shadow:0 0 0 1px var(--rule);padding:0;cursor:pointer}
+.swatch.gold{background:linear-gradient(135deg,#8a6a1f,#f3d77a 45%,#b8892c);margin-left:8px}
+.swatch.water{background:radial-gradient(circle at 34% 32%,rgba(255,255,255,.95),rgba(255,255,255,0) 40%),var(--paper);box-shadow:0 0 0 1px var(--muted)}
+.swatch[aria-pressed="true"]{box-shadow:0 0 0 2px var(--ink)}
+.pigname{font-size:12px;color:var(--muted);min-width:9.5em}
+button.tool,select{font:500 12px var(--mono);color:var(--ink);background:var(--chip);border:1px solid var(--rule);border-radius:3px;padding:5px 9px;cursor:pointer}
+label.dry{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+button:focus-visible,select:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.board{position:relative;flex:1;min-height:0;touch-action:none;cursor:crosshair;overflow:hidden}
+.board canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#stains{mix-blend-mode:var(--blend)}
+.hint{position:absolute;left:0;right:0;top:38%;text-align:center;font-family:var(--display);font-weight:500;font-size:18px;color:var(--muted);pointer-events:none;transition:opacity .8s ease}
+.hint.gone{opacity:0}
+.credit{position:absolute;margin:0;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(8px + env(safe-area-inset-bottom,0px));right:max(16px,env(safe-area-inset-right,0px));font-size:11px;color:var(--muted);pointer-events:none}
+@media (prefers-reduced-motion: reduce){.hint{transition:none}}
+#liveLine{color:var(--ink)}
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="name">
+    <h1>Watercolour Pachinko</h1>
+    <p>Tap or hold to pour. Everyone's pours fall on your board too. Stains dry in <span id="dryLabel">30 s</span>. Nothing here is kept.</p>
+    <p id="liveLine" aria-live="polite">Connecting to the room…</p>
+    <p id="skyLine" aria-live="off">Shared sky</p>
+  </div>
+  <div class="controls">
+    <div id="pigments" class="pigments" role="group" aria-label="Medium"></div>
+    <span id="pigName" class="pigname">Ultramarine</span>
+    <button id="rain" class="tool" type="button">Rain</button>
+    <button id="sky" class="tool" type="button" aria-pressed="true">Sky: shared</button>
+    <button id="layout" class="tool" type="button">Pins: grid</button>
+    <label class="dry" for="dry">Drying
+      <select id="dry">
+        <option value="10">10 s</option>
+        <option value="30" selected>30 s</option>
+        <option value="120">2 min</option>
+      </select>
+    </label>
+    <button id="sound" class="tool" type="button" aria-pressed="true">Sound on</button>
+  </div>
+</header>
+
+<main id="board" class="board" aria-label="Pachinko board. Tap or hold to pour paint, gold leaf or water through the pins.">
+  <canvas id="stains"></canvas>
+  <canvas id="main"></canvas>
+  <div id="hint" class="hint">Tap or hold anywhere to pour</div>
+  <p class="credit">Pins and bell sound adapted from "A love letter to pachinko" by Liam Egan (@shubniggurath on CodePen, MIT licence).</p>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.min.js"></script>
+<script>
+// Live room. Both values are public by design (the publishable/anon key). Never put the service_role key here.
+const SUPABASE_URL = 'https://dazdbxyjprdjlbjkvlrx.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_P7EyUbg3Y0hB6a3oE_Y_rA_Z8XBeBYQ';
+(() => {
+const $ = id => document.getElementById(id);
+const board = $('board'), sc = $('stains'), mc = $('main');
+const sg = sc.getContext('2d'), mg = mc.getContext('2d');
+if (!window.Matter) { $('hint').textContent = 'The physics library did not load. Reload the page to try again.'; return; }
+const { Engine, Bodies, Body, Composite, Events } = window.Matter;
+
+// Watercolour pigments: light variants multiply onto paper, dark variants glow on the night board.
+const PIGMENTS = [
+  { name: 'Ultramarine',       light: '#2747b5', dark: '#5a7dff' },
+  { name: 'Quinacridone rose', light: '#cf2f6e', dark: '#ff5c9a' },
+  { name: 'Hansa yellow',      light: '#e6b41a', dark: '#ffd544' },
+  { name: 'Viridian',          light: '#13856b', dark: '#33d6a8' },
+  { name: 'Burnt sienna',      light: '#b0502a', dark: '#ff8c55' },
+  { name: "Payne's grey",      light: '#3d4757', dark: '#a3b5d3' },
+];
+const GOLD = PIGMENTS.length, WATER = PIGMENTS.length + 1;
+const MEDIA = [...PIGMENTS.map(p => p.name), 'Gold leaf', 'Clear water'];
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const S = {
+  w: 1, h: 1, dpr: 1, u: 46,
+  pins: [], walls: [], drops: new Map(), stains: [], glints: [],
+  layout: 'grid', pigment: 0, dry: 30, muted: false, sky: !reduced,
+  lastUser: 0, lastPlay: 0, frame: 0,
+  theme: { blend: 'multiply', pin: '#1c1f24', dark: false },
+};
+const engine = Engine.create({ gravity: { x: 0, y: 0.6 } });
+
+// ---------- Theme ----------
+function readTheme() {
+  const cs = getComputedStyle(document.documentElement);
+  const blend = cs.getPropertyValue('--blend').trim() || 'multiply';
+  const pin = cs.getPropertyValue('--pin').trim() || '#1c1f24';
+  const dark = blend === 'screen';
+  const changed = dark !== S.theme.dark;
+  S.theme = { blend, pin, dark };
+  if (changed) paintSwatches();
+}
+const colours = () => PIGMENTS.map(p => S.theme.dark ? p.dark : p.light);
+
+// ---------- Board (pin layouts after "A love letter to pachinko") ----------
+const metrics = () => ({ margin: 1.4 * S.u, sx: 2.2 * S.u, sy: 1.7 * S.u, top: 2.5 * S.u });
+const pinR = () => Math.max(5, S.u * 0.15);
+const CH = { armPins: 3, armStep: -1.1, slope: 0.7, colGap: 5.5, rowGap: 5.2 };
+const WV = { ampSpacing: 0.35, ampRadius: 0.7, wavelength: 7, ySkew: 0.86, rowAmp: -0.35 };
+const LAYOUTS = {
+  grid(m) {
+    const pts = []; let row = 0;
+    for (let py = m.top; py < S.h - m.sy * 0.25; py += m.sy, row++) {
+      const off = row % 2 ? m.sx / 2 : 0;
+      for (let px = m.margin + off; px <= S.w - m.margin; px += m.sx) pts.push({ x: px, y: py });
+    }
+    return pts;
+  },
+  chevrons(m) {
+    const u = S.u, step = CH.armStep * u, halfW = CH.armPins * step;
+    const colGap = CH.colGap * u, rowGap = CH.rowGap * u, pts = [];
+    let row = 0;
+    for (let ty = m.top + halfW * Math.abs(CH.slope); ty < S.h; ty += rowGap, row++) {
+      const shift = row % 2 ? colGap / 2 : 0;
+      const usable = S.w - 2 * (m.margin + halfW);
+      const n = Math.max(1, Math.floor(usable / colGap) + 1);
+      const startX = S.w / 2 - ((n - 1) / 2) * colGap + shift;
+      for (let i = -1; i <= n; i++) {
+        const tx = startX + i * colGap;
+        if (tx - halfW < m.margin || tx + halfW > S.w - m.margin) continue;
+        pts.push({ x: tx, y: ty, r: pinR() * 1.3 });
+        for (let k = 1; k <= CH.armPins; k++) {
+          const dy = -k * step * CH.slope;
+          pts.push({ x: tx - k * step, y: ty + dy, r: pinR() * 1.3 });
+          pts.push({ x: tx + k * step, y: ty + dy, r: pinR() * 1.3 });
+        }
+      }
+    }
+    return pts.filter(p => p.y > m.top * 0.6);
+  },
+  waves(m) {
+    const k = (2 * Math.PI) / (WV.wavelength * S.u), pts = [];
+    let py = m.top, row = 0;
+    while (py < S.h) {
+      let px = m.margin + (row % 2 ? m.sx / 2 : 0);
+      while (px <= S.w - m.margin) {
+        const s = Math.sin(k * (px + WV.ySkew * py));
+        pts.push({ x: px, y: py, r: pinR() * (1 + WV.ampRadius * s) });
+        px += m.sx * (1 + WV.ampSpacing * s);
+      }
+      py += m.sy * (1 + WV.rowAmp * Math.sin(k * WV.ySkew * py));
+      row++;
+    }
+    return pts;
+  },
+};
+function buildBoard() {
+  for (const p of S.pins) Composite.remove(engine.world, p.body);
+  for (const w of S.walls) Composite.remove(engine.world, w);
+  S.pins = [];
+  S.walls = [
+    Bodies.rectangle(-50, S.h / 2, 100, S.h * 3, { isStatic: true }),
+    Bodies.rectangle(S.w + 50, S.h / 2, 100, S.h * 3, { isStatic: true }),
+  ];
+  Composite.add(engine.world, S.walls);
+  for (const { x, y, r } of LAYOUTS[S.layout](metrics())) {
+    const rad = Math.max(3, r ?? pinR());
+    const body = Bodies.circle(x, y, rad, { isStatic: true, restitution: 0.5, label: 'pin' });
+    S.pins.push({ x, y, r: rad, body });
+  }
+  Composite.add(engine.world, S.pins.map(p => p.body));
+}
+
+// ---------- Marks ----------
+// A fresh mark stays wet for 1.5 s and is drawn on its own. Then it is baked into one of nine
+// half-resolution layers, each holding an eighth of the drying time, and the layer fades as a whole.
+// So no mark is ever thrown away early, however much paint is poured.
+const WET = 1500, NB = 9, BS = 0.5;
+const layers = [];
+let layerCur = -1;
+function makeLayers() {
+  layers.length = 0;
+  for (let i = 0; i < NB; i++) {
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(S.w * BS)); c.height = Math.max(1, Math.round(S.h * BS));
+    const g = c.getContext('2d');
+    g.setTransform(BS, 0, 0, BS, 0, 0); g.lineCap = 'round';
+    layers.push({ c, g, start: -Infinity, len: 1 });
+  }
+  layerCur = -1;
+}
+function currentLayer(now) {
+  let L = layers[layerCur];
+  if (!L || now - L.start >= L.len) {
+    layerCur = (layerCur + 1) % NB; L = layers[layerCur];
+    L.g.setTransform(1, 0, 0, 1, 0, 0); L.g.clearRect(0, 0, L.c.width, L.c.height); L.g.setTransform(BS, 0, 0, BS, 0, 0);
+    L.start = now; L.len = (S.dry * 1000) / (NB - 1);
+  }
+  return L;
+}
+function layerAlpha(L, now) {
+  const life = S.dry * 1000, age = Math.max(0, now - (L.start + L.len / 2));
+  return age >= life ? 0 : Math.pow(1 - age / life, 1.3);
+}
+// Which pigment was laid down near a point lately: clear water pushes that colour into its ring.
+const GRID = 32, gridMap = new Map();
+function noteColour(x, y, p, now) { gridMap.set(((x / GRID) | 0) + ',' + ((y / GRID) | 0), { p, t: now }); }
+function colourNear(x, y, R, now) {
+  const life = S.dry * 1000, r = Math.ceil(R / GRID), cx = (x / GRID) | 0, cy = (y / GRID) | 0;
+  let best = -1, bt = -1;
+  for (let i = -r; i <= r; i++) for (let j = -r; j <= r; j++) {
+    const e = gridMap.get((cx + i) + ',' + (cy + j));
+    if (e && now - e.t < life && e.t > bt) { bt = e.t; best = e.p; }
+  }
+  return best;
+}
+function addStain(x, y, r, p, a, ring = false) {
+  const now = performance.now();
+  if (S.stains.length > 4000) bakeStain(S.stains.shift(), now); // bake early, never drop
+  const s = { x, y, r, p, a, ring, t: now };
+  if (!ring) noteColour(x, y, p, now);
+  if (ring) {
+    // A backrun edge: a wobbling outline of uneven thickness, broken in places.
+    const n = 22 + Math.floor(Math.random() * 10);
+    const f1 = 2 + Math.floor(Math.random() * 3), f2 = 5 + Math.floor(Math.random() * 4);
+    const p1 = Math.random() * 6.2832, p2 = Math.random() * 6.2832;
+    s.shape = Array.from({ length: n }, (_, i) => {
+      const th = (i / n) * 6.2832;
+      return {
+        th,
+        k: 1 + 0.12 * Math.sin(f1 * th + p1) + 0.06 * Math.sin(f2 * th + p2) + (Math.random() - 0.5) * 0.05,
+        w: 0.04 + Math.random() * 0.11,
+        gap: Math.random() < 0.14,
+      };
+    });
+  }
+  S.stains.push(s);
+}
+// Clear water lifts the paint it touches and pushes a little of it into a pale-centred ring.
+function lift(x, y, R, strength, ring) {
+  const now = performance.now(), life = S.dry * 1000;
+  for (const s of S.stains) {
+    if (s.ring) continue;
+    const d = Math.hypot(s.x - x, s.y - y), reach = R + s.r;
+    if (d < reach) s.a *= 1 - strength * (1 - d / reach);
+  }
+  // Dried paint is lifted straight out of the layers.
+  for (const L of layers) {
+    if (now - (L.start + L.len / 2) >= life) continue;
+    const g = L.g, rr = R * 1.15;
+    g.save();
+    g.globalCompositeOperation = 'destination-out';
+    const grd = g.createRadialGradient(x, y, 0, x, y, rr);
+    grd.addColorStop(0, 'rgba(0,0,0,' + strength + ')');
+    grd.addColorStop(0.7, 'rgba(0,0,0,' + (strength * 0.6) + ')');
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grd; g.beginPath(); g.arc(x, y, rr, 0, TAU); g.fill();
+    g.restore();
+  }
+  if (ring) { const p = colourNear(x, y, R, now); if (p >= 0) addStain(x, y, R * 0.65, p, 0.26, true); }
+}
+function addGlint(x, y, size) { if (S.glints.length < 400) S.glints.push({ x, y, s: size, t: performance.now() }); }
+
+// `rand` lets the shared sky spawn the same drop, the same way, on every screen.
+function spawnDrop(x, p, rand = Math.random) {
+  if (S.drops.size >= 300) removeDrop(S.drops.keys().next().value);
+  const r0 = S.u * 0.2;
+  x = Math.min(S.w - r0, Math.max(r0, x));
+  let body, kind;
+  if (p === GOLD) {
+    kind = 'gold';
+    body = Bodies.rectangle(x, -S.u * 0.3 - rand() * 18, S.u * 0.34, S.u * 0.13,
+      { label: 'drop', restitution: 0.15, friction: 0.05, frictionAir: 0.06, density: 0.0006 });
+    Body.setAngle(body, rand() * Math.PI);
+    Body.setAngularVelocity(body, (rand() - 0.5) * 0.2);
+  } else {
+    kind = p === WATER ? 'water' : 'paint';
+    const r = kind === 'water' ? r0 * 1.15 : r0;
+    body = Bodies.circle(x, -r - rand() * 18, r, { label: 'drop', restitution: 0.35, friction: 0.02, frictionAir: 0.01 });
+    Body.setVelocity(body, { x: (rand() - 0.5) * 1.2, y: 1 });
+  }
+  Composite.add(engine.world, body);
+  const r = kind === 'water' ? r0 * 1.15 : r0;
+  S.drops.set(body.id, { body, p, kind, paint: 1, r, r0: r, dead: false, phase: rand() * 6.28, born: performance.now() });
+}
+function removeDrop(id) {
+  const d = S.drops.get(id); if (!d) return;
+  Composite.remove(engine.world, d.body); S.drops.delete(id);
+}
+function shrink(d) {
+  const nr = d.r0 * Math.sqrt(d.paint), k = nr / d.r;
+  if (k < 0.995) { Body.scale(d.body, k, k); d.r = nr; }
+}
+// A paint drop spends some of its paint on every pin it hits, and shrinks as it goes.
+function splash(d, norm, pin) {
+  const { x, y } = d.body.position, p = d.p;
+  addStain(x, y, d.r * 1.25, p, 0.30);
+  const n = 3 + Math.round(norm * 6);
+  for (let i = 0; i < n; i++) {
+    const ang = Math.random() * Math.PI * 2, dist = d.r * (1 + Math.random() * 2.6 * (0.4 + norm));
+    addStain(x + Math.cos(ang) * dist, y + Math.sin(ang) * dist, d.r * (0.22 + Math.random() * 0.5), p, 0.26);
+  }
+  addStain(pin.position.x, pin.position.y, (pin.circleRadius || 6) * 1.7, p, 0.14);
+  d.paint -= 0.07 + 0.11 * norm;
+  if (d.paint <= 0.12) { addStain(x, y, d.r * 0.9, p, 0.22); d.dead = true; return; }
+  shrink(d);
+}
+function wetSplash(d, norm, pin) {
+  const { x, y } = d.body.position, now = performance.now();
+  // One thread loop per pin every two seconds, so a lot of water still draws rather than tangles.
+  const ringOk = !(pin.lastRing && now - pin.lastRing < 2000);
+  if (ringOk) pin.lastRing = now;
+  lift(x, y, d.r * (2 + norm * 2.5), 0.85, ringOk);
+  lift(pin.position.x, pin.position.y, (pin.circleRadius || 6) * 2.2, 0.6, false);
+  d.paint -= 0.06 + 0.1 * norm;
+  if (d.paint <= 0.12) { lift(x, y, d.r * 2, 0.7, false); d.dead = true; return; }
+  shrink(d);
+}
+function goldHit(d, norm) {
+  const { x, y } = d.body.position;
+  const n = 2 + Math.round(norm * 4);
+  for (let i = 0; i < n; i++) addGlint(x + (Math.random() - 0.5) * S.u * 0.5, y + (Math.random() - 0.5) * S.u * 0.5, S.u * (0.12 + Math.random() * 0.14));
+}
+
+// ---------- Sound (bell after "A love letter to pachinko"; pitch follows the pin's height) ----------
+let AC = null, bus = null;
+function audio() {
+  if (!AC) {
+    const C = window.AudioContext || window.webkitAudioContext; if (!C) return null;
+    AC = new C();
+    const comp = AC.createDynamicsCompressor();
+    comp.threshold.value = -20; comp.knee.value = 12; comp.ratio.value = 8; comp.attack.value = 0.002; comp.release.value = 0.15;
+    comp.connect(AC.destination); bus = comp;
+  }
+  if (AC.state === 'suspended') AC.resume();
+  return AC;
+}
+const BELL  = [{ ratio: 1, gain: 1, decay: 1 }, { ratio: 2, gain: 0.42, decay: 0.62 }, { ratio: 4, gain: 0.32, decay: 0.32 }];
+const GLOCK = [{ ratio: 1, gain: 1, decay: 1 }, { ratio: 2.76, gain: 0.45, decay: 0.5 }, { ratio: 5.4, gain: 0.25, decay: 0.28 }];
+const PENT = [0, 3, 5, 7, 10], ROOT = 161.6; // E3, minor pentatonic upwards
+function noteFor(py) {
+  const top = metrics().top * 0.6;
+  const t = Math.min(1, Math.max(0, (py - top) / Math.max(1, S.h - top)));
+  const idx = Math.round((1 - t) * 12);
+  return ROOT * Math.pow(2, (Math.floor(idx / 5) * 12 + PENT[idx % 5]) / 12);
+}
+const ready = () => !S.muted && AC && AC.state === 'running';
+function panned(ctx, px, node) {
+  const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+  if (pan) { pan.pan.value = Math.max(-0.8, Math.min(0.8, (px / S.w) * 2 - 1)); node.connect(pan); pan.connect(bus); } else node.connect(bus);
+  return pan;
+}
+function ring(px, f0, partials, decay, vol, lpOpen, lpClose) {
+  if (!ready()) return;
+  const ctx = AC, t0 = ctx.currentTime + 0.002 + Math.random() * 0.006;
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass'; lp.Q.value = 0.5;
+  lp.frequency.setValueAtTime(lpOpen, t0);
+  lp.frequency.exponentialRampToValueAtTime(lpClose, t0 + decay);
+  const v = ctx.createGain(); v.gain.value = vol;
+  lp.connect(v);
+  const pan = panned(ctx, px, v);
+  let last = null, lastEnd = 0;
+  for (const p of partials) {
+    const o = ctx.createOscillator(), e = ctx.createGain(), end = t0 + decay * p.decay;
+    o.type = 'sine'; o.frequency.value = f0 * p.ratio;
+    e.gain.setValueAtTime(0, t0);
+    e.gain.linearRampToValueAtTime(p.gain, t0 + 0.003);
+    e.gain.exponentialRampToValueAtTime(0.0005, end);
+    o.connect(e); e.connect(lp); o.start(t0); o.stop(end + 0.02);
+    if (end > lastEnd) { lastEnd = end; last = o; }
+  }
+  last.onended = () => { v.disconnect(); lp.disconnect(); if (pan) pan.disconnect(); };
+}
+function drip(px, py, norm) {
+  if (!ready()) return;
+  const ctx = AC, t0 = ctx.currentTime + 0.002, f = noteFor(py) * 1.5;
+  const o = ctx.createOscillator(), e = ctx.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(f, t0);
+  o.frequency.exponentialRampToValueAtTime(f * 0.55, t0 + 0.07);
+  e.gain.setValueAtTime(0, t0);
+  e.gain.linearRampToValueAtTime(0.05 * (0.4 + 0.6 * norm), t0 + 0.004);
+  e.gain.exponentialRampToValueAtTime(0.0005, t0 + 0.14);
+  o.connect(e);
+  const pan = panned(ctx, px, e);
+  o.start(t0); o.stop(t0 + 0.16);
+  o.onended = () => { e.disconnect(); if (pan) pan.disconnect(); };
+}
+function sound(kind, px, py, norm) {
+  if (kind === 'gold') ring(px, noteFor(py) * 2, GLOCK, 0.9 + 0.5 * norm, 0.05 * (0.4 + 0.6 * norm), 7000, 2500);
+  else if (kind === 'water') drip(px, py, norm);
+  else ring(px, noteFor(py), BELL, 0.5 + 0.4 * norm, 0.08 * (0.3 + 0.7 * norm), 900 + 2800 * norm, 600);
+}
+
+Events.on(engine, 'collisionStart', ev => {
+  let played = 0; const now = performance.now();
+  for (const pair of ev.pairs) {
+    const a = pair.bodyA.parent || pair.bodyA, b = pair.bodyB.parent || pair.bodyB;
+    const pin = a.label === 'pin' ? a : b.label === 'pin' ? b : null; if (!pin) continue;
+    const drop = pin === a ? b : a, d = S.drops.get(drop.id); if (!d || d.dead) continue;
+    const speed = Math.hypot(drop.velocity.x, drop.velocity.y);
+    const norm = Math.min(1, Math.max(0, (speed - 1.5) / 10));
+    if (d.kind === 'gold') goldHit(d, norm);
+    else if (d.kind === 'water') wetSplash(d, norm, pin);
+    else splash(d, norm, pin);
+    const minSpeed = d.kind === 'gold' ? 0.8 : 2.5;
+    if (speed >= minSpeed && played < 6 && now - S.lastPlay > 12) { sound(d.kind, pin.position.x, pin.position.y, norm); S.lastPlay = now; played++; }
+  }
+});
+
+// ---------- Drawing ----------
+const TAU = Math.PI * 2;
+function drawMark(g, s, al, rr, col) {
+  g.globalAlpha = al; g.strokeStyle = g.fillStyle = col;
+  if (s.ring) {
+    const pts = s.shape, n = pts.length;
+    for (let q = 0; q < n; q++) {
+      const a1 = pts[q], a2 = pts[(q + 1) % n];
+      if (a1.gap) continue;
+      const r1 = rr * a1.k, r2 = rr * a2.k, th2 = q === n - 1 ? a2.th + TAU : a2.th;
+      g.lineWidth = Math.max(0.8, rr * a1.w);
+      g.beginPath();
+      g.moveTo(s.x + Math.cos(a1.th) * r1, s.y + Math.sin(a1.th) * r1);
+      g.lineTo(s.x + Math.cos(th2) * r2, s.y + Math.sin(th2) * r2);
+      g.stroke();
+    }
+    return;
+  }
+  g.beginPath(); g.arc(s.x, s.y, rr, 0, TAU); g.fill();
+  if (rr > 5) { g.globalAlpha = al * 0.55; g.lineWidth = Math.max(1, rr * 0.12); g.stroke(); }
+}
+function bakeStain(s, now) {
+  if (!layers.length || s.a < 0.004) return;
+  const g = currentLayer(now).g;
+  g.globalCompositeOperation = S.theme.blend;
+  drawMark(g, s, s.a, s.ring ? s.r : s.r * 1.2, colours()[s.p]);
+  g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+}
+function drawStains(now) {
+  sg.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
+  sg.clearRect(0, 0, S.w, S.h);
+  sg.globalCompositeOperation = S.theme.blend; sg.lineCap = 'round';
+  // Dried layers, oldest first, each fading as a whole.
+  const live = layers.filter(L => L.start > -Infinity).sort((a, b) => a.start - b.start);
+  for (const L of live) {
+    const al = layerAlpha(L, now);
+    if (al <= 0.003) continue;
+    sg.globalAlpha = al; sg.drawImage(L.c, 0, 0, S.w, S.h);
+  }
+  // Wet marks, drawn one by one while they bloom, then baked.
+  const cols = colours(), arr = S.stains;
+  let j = 0;
+  for (let i = 0; i < arr.length; i++) {
+    const s = arr[i], age = now - s.t;
+    if (s.a < 0.004) continue;
+    if (age >= WET) { bakeStain(s, now); continue; }
+    arr[j++] = s;
+    drawMark(sg, s, s.a, s.ring ? s.r : s.r * (1 + 0.2 * age / WET), cols[s.p]);
+  }
+  arr.length = j;
+  sg.globalAlpha = 1; sg.globalCompositeOperation = 'source-over';
+}
+function drawGlints(now) {
+  const col = S.theme.dark ? '#fff1b3' : '#a8740f';
+  mg.strokeStyle = col; mg.lineCap = 'round';
+  let j = 0;
+  for (let i = 0; i < S.glints.length; i++) {
+    const g = S.glints[i], age = (now - g.t) / 650;
+    if (age >= 1) continue;
+    S.glints[j++] = g;
+    const s = g.s * (0.6 + 0.6 * Math.sin(age * Math.PI));
+    mg.globalAlpha = 1 - age; mg.lineWidth = Math.max(1, g.s * 0.12);
+    mg.beginPath(); mg.moveTo(g.x - s, g.y); mg.lineTo(g.x + s, g.y); mg.moveTo(g.x, g.y - s); mg.lineTo(g.x, g.y + s); mg.stroke();
+  }
+  S.glints.length = j;
+  mg.globalAlpha = 1;
+}
+function drawMain(now) {
+  mg.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
+  mg.clearRect(0, 0, S.w, S.h);
+  mg.fillStyle = S.theme.pin;
+  for (const p of S.pins) { mg.beginPath(); mg.arc(p.x, p.y, p.r, 0, TAU); mg.fill(); }
+  const cols = colours(), dark = S.theme.dark;
+  for (const d of S.drops.values()) {
+    const b = d.body, { x, y } = b.position;
+    if (d.kind === 'gold') {
+      // Leaf colour swings from deep to bright as the flake turns to the light.
+      const shine = Math.pow(Math.abs(Math.cos(b.angle * 2 + now / 450 + d.phase)), 4);
+      mg.beginPath(); const v = b.vertices; mg.moveTo(v[0].x, v[0].y); for (let i = 1; i < v.length; i++) mg.lineTo(v[i].x, v[i].y); mg.closePath();
+      mg.globalAlpha = 0.95; mg.fillStyle = '#b8892c'; mg.fill();
+      mg.globalAlpha = 0.2 + 0.75 * shine; mg.fillStyle = '#ffeaa0'; mg.fill();
+      if (shine > 0.93 && Math.random() < 0.08) addGlint(x, y, S.u * 0.16);
+      mg.globalAlpha = 1;
+      continue;
+    }
+    if (d.kind === 'water') {
+      mg.globalAlpha = 1;
+      mg.fillStyle = dark ? 'rgba(200,220,255,.12)' : 'rgba(255,255,255,.4)';
+      mg.strokeStyle = dark ? 'rgba(220,235,255,.6)' : 'rgba(30,40,60,.35)';
+      mg.lineWidth = 1.2;
+      mg.beginPath(); mg.arc(x, y, d.r, 0, TAU); mg.fill(); mg.stroke();
+    } else {
+      mg.globalAlpha = 0.55 + 0.45 * Math.min(1, d.paint); mg.fillStyle = cols[d.p];
+      mg.beginPath(); mg.arc(x, y, d.r, 0, TAU); mg.fill();
+    }
+    mg.globalAlpha = d.kind === 'water' ? 0.8 : 0.35; mg.fillStyle = '#ffffff';
+    mg.beginPath(); mg.arc(x - d.r * 0.35, y - d.r * 0.35, d.r * 0.26, 0, TAU); mg.fill();
+    mg.globalAlpha = 1;
+  }
+  drawGlints(now);
+  drawMarkers(now);
+}
+function loop(now) {
+  requestAnimationFrame(loop);
+  skyStep();
+  remoteStep(now);
+  // Gold leaf flutters: a sideways sway, and a little lift while it lies flat.
+  const t = now / 1000;
+  for (const d of S.drops.values()) {
+    if (d.kind !== 'gold') continue;
+    const b = d.body;
+    Body.applyForce(b, b.position, {
+      x: Math.sin(t * 2.2 + d.phase) * b.mass * 0.00035,
+      y: -b.mass * 0.00012 * Math.abs(Math.cos(b.angle)),
+    });
+    Body.setAngularVelocity(b, b.angularVelocity * 0.98 + Math.sin(t * 3 + d.phase) * 0.004);
+  }
+  Engine.update(engine, 1000 / 60);
+  S.frame++;
+  for (const [id, d] of S.drops) {
+    const b = d.body;
+    if (d.dead || b.position.y > S.h + 60 || (d.kind === 'gold' && now - d.born > 40000)) { removeDrop(id); continue; }
+    if (S.frame % 5 === 0 && b.position.y > 0 && Math.hypot(b.velocity.x, b.velocity.y) > 2) {
+      if (d.kind === 'paint') { addStain(b.position.x, b.position.y, d.r * 0.42, d.p, 0.13); d.paint -= 0.004; }
+      else if (d.kind === 'water') { lift(b.position.x, b.position.y, d.r * 1.1, 0.35, false); }
+    }
+  }
+  if (S.frame % 2 === 0) drawStains(now);
+  drawMain(now);
+  if (S.frame % 60 === 0) readTheme();
+}
+
+// ---------- Size ----------
+function resize() {
+  const r = board.getBoundingClientRect();
+  S.w = Math.max(1, Math.round(r.width)); S.h = Math.max(1, Math.round(r.height));
+  S.dpr = Math.min(2, window.devicePixelRatio || 1);
+  for (const c of [sc, mc]) { c.width = Math.round(S.w * S.dpr); c.height = Math.round(S.h * S.dpr); }
+  S.u = S.w < 700 ? 34 : S.w > 1000 ? 60 : 46;
+  makeLayers();
+  buildBoard();
+}
+let rt = null;
+new ResizeObserver(() => { clearTimeout(rt); rt = setTimeout(resize, 150); }).observe(board);
+
+// ---------- Controls ----------
+function paintSwatches() {
+  const cols = colours();
+  [...$('pigments').children].forEach((b, i) => { if (i < PIGMENTS.length) b.style.background = cols[i]; });
+}
+MEDIA.forEach((name, i) => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.id = 'pig' + i;
+  b.className = 'swatch' + (i === GOLD ? ' gold' : i === WATER ? ' water' : '');
+  b.setAttribute('aria-label', name); b.title = name + ' (key ' + (i + 1) + ')';
+  b.setAttribute('aria-pressed', i === 0 ? 'true' : 'false');
+  b.addEventListener('click', () => pick(i));
+  $('pigments').append(b);
+});
+function pick(i) {
+  S.pigment = i;
+  [...$('pigments').children].forEach((b, k) => b.setAttribute('aria-pressed', k === i ? 'true' : 'false'));
+  $('pigName').textContent = MEDIA[i];
+}
+const randomPigment = () => Math.floor(Math.random() * PIGMENTS.length);
+// A burst of rain from a seed, so the same burst can be sent to every board as one short message.
+function rainFrom(seed) {
+  const n = 25 + Math.floor(rnd(seed, 1) * 20);
+  for (let i = 0; i < n; i++) {
+    const x = 0.05 + rnd(seed, 10 + i * 3) * 0.9, c = rnd(seed, 11 + i * 3);
+    const p = c < 0.12 ? GOLD : Math.floor(rnd(seed, 12 + i * 3) * PIGMENTS.length);
+    setTimeout(() => spawnDrop(S.w * x, p), i * 40);
+  }
+}
+let lastRain = 0;
+function rain() {
+  audio(); S.lastUser = Date.now(); hideHint();
+  const now = performance.now();
+  if (now - lastRain < 3000) return; // one burst every three seconds, here and on everyone's board
+  lastRain = now;
+  const seed = (Math.random() * 2147483647) | 0;
+  rainFrom(seed);
+  net.send({ rain: seed });
+}
+$('rain').addEventListener('click', rain);
+const NAMES = Object.keys(LAYOUTS);
+$('layout').addEventListener('click', () => {
+  S.layout = NAMES[(NAMES.indexOf(S.layout) + 1) % NAMES.length];
+  $('layout').textContent = 'Pins: ' + S.layout; buildBoard();
+});
+$('dry').addEventListener('change', e => {
+  S.dry = +e.target.value;
+  $('dryLabel').textContent = S.dry >= 60 ? (S.dry / 60) + ' min' : S.dry + ' s';
+});
+$('sound').addEventListener('click', () => {
+  S.muted = !S.muted; if (!S.muted) audio();
+  $('sound').textContent = S.muted ? 'Sound off' : 'Sound on';
+  $('sound').setAttribute('aria-pressed', S.muted ? 'false' : 'true');
+});
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.target.tagName === 'SELECT') return;
+  const n = parseInt(e.key, 10);
+  if (n >= 1 && n <= MEDIA.length) pick(n - 1);
+  else if (e.key === 'r' || e.key === 'R') rain();
+});
+
+// Pour: tap for one drop, hold to keep pouring, drag to move the stream.
+let pouring = false, pourX = 0, pourTimer = null;
+const localX = e => e.clientX - board.getBoundingClientRect().left;
+function hideHint() { $('hint').classList.add('gone'); }
+board.addEventListener('pointerdown', e => {
+  if (e.button > 0) return;
+  audio(); S.lastUser = Date.now(); hideHint();
+  pouring = true; try { board.setPointerCapture(e.pointerId); } catch (_) {}
+  pourX = localX(e); spawnDrop(pourX, S.pigment);
+  net.pourStart(pourX / S.w, S.pigment);
+  clearInterval(pourTimer);
+  const every = pourEvery(S.pigment);
+  pourTimer = setInterval(() => {
+    if (!pouring) return;
+    spawnDrop(pourX + (Math.random() - 0.5) * 6, S.pigment); S.lastUser = Date.now();
+    net.pourTick(pourX / S.w);
+  }, every);
+});
+board.addEventListener('pointermove', e => { if (pouring) pourX = localX(e); });
+const stopPour = () => { if (pouring) net.pourStop(); pouring = false; clearInterval(pourTimer); };
+board.addEventListener('pointerup', stopPour);
+board.addEventListener('pointercancel', stopPour);
+
+// A light drizzle keeps the board alive when nobody is pouring (silent until someone has tapped).
+setInterval(() => {
+  if (S.sky || reduced || document.hidden || Date.now() - S.lastUser < 5000) return;
+  spawnDrop(S.w * (0.1 + Math.random() * 0.8), randomPigment());
+}, 1100);
+
+// ---------- Shared sky: the same rain for everyone, worked out from the clock ----------
+// Time is cut into quarter-second ticks. Each tick's drops (whether, where, which colour) come from
+// a hash of the tick number, so every screen open at that moment spawns the same rain. Screens differ
+// in size, so the pins differ, and everyone still ends up with a different painting.
+// Every ten minutes on the minute, a 45-second downpour in that period's two colours.
+const TICK = 250, PERIOD = 600000, POUR = 45000;
+function rnd(k, salt) {
+  let x = Math.imul((k % 4294967296) | 0, 374761393) ^ Math.imul(salt, 668265263);
+  x = Math.imul(x ^ (x >>> 13), 1274126177);
+  x ^= x >>> 16;
+  return (x >>> 0) / 4294967296;
+}
+function skyDrops(k) {
+  const t = k * TICK, P = Math.floor(t / PERIOD), into = t - P * PERIOD;
+  let chance = 0.1 + 0.07 * Math.sin((t / 180000) * 2 * Math.PI), n = 1;
+  if (into < POUR) { chance = into > POUR - 10000 ? 0.1 + 0.75 * (POUR - into) / 10000 : 0.85; n = 2; }
+  const a = Math.floor(rnd(P, 11) * PIGMENTS.length), b = Math.floor(rnd(P, 12) * PIGMENTS.length);
+  const out = [];
+  for (let j = 0; j < n; j++) {
+    const salt = 100 + j * 17;
+    if (rnd(k, salt) > chance) continue;
+    const c = rnd(k, salt + 1);
+    const p = c < 0.07 ? GOLD : c < 0.45 ? a : c < 0.72 ? b : Math.floor(rnd(k, salt + 2) * PIGMENTS.length);
+    out.push({ x: 0.04 + 0.92 * rnd(k, salt + 3), p, k, salt });
+  }
+  return out;
+}
+let skyLast = Math.floor(Date.now() / TICK);
+function skyStep() {
+  const k = Math.floor(Date.now() / TICK);
+  if (!S.sky || document.hidden) { skyLast = k; return; }
+  for (let q = Math.max(skyLast + 1, k - 8); q <= k; q++) {
+    for (const d of skyDrops(q)) {
+      let i = 0;
+      spawnDrop(d.x * S.w, d.p, () => rnd(d.k, d.salt + 50 + i++));
+    }
+  }
+  skyLast = k;
+}
+function skyLabel() {
+  const el = $('skyLine');
+  if (!S.sky) { el.textContent = 'Shared sky is off: only your own rain falls.'; return; }
+  const now = Date.now(), P = Math.floor(now / PERIOD), into = now - P * PERIOD;
+  if (into < POUR) { el.textContent = 'Shared sky: downpour now, on every screen.'; return; }
+  const hhmm = new Date((P + 1) * PERIOD).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const s = Math.ceil(((P + 1) * PERIOD - now) / 1000);
+  el.textContent = 'Shared sky: next downpour at ' + hhmm + ', in ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + '.';
+}
+function showSky() {
+  $('sky').textContent = S.sky ? 'Sky: shared' : 'Sky: off';
+  $('sky').setAttribute('aria-pressed', String(S.sky));
+  skyLabel();
+}
+$('sky').addEventListener('click', () => { S.sky = !S.sky; skyLast = Math.floor(Date.now() / TICK); showSky(); });
+setInterval(skyLabel, 1000);
+
+// ---------- Live room: other people's pours, sent as stream states, never as drops ----------
+// A message says "this person is pouring this colour at this point across the width", or "stopped".
+// Each board makes the drops itself at the local pour rate, so a fast sender cannot flood anyone's board,
+// and the free plan's message cap (100/s for the whole project) holds with a full room.
+// Nothing is stored: Supabase only relays the messages to whoever is connected at that moment.
+function pourEvery(p) { return p === GOLD ? 160 : 90; }
+const STALE = 4000, MAX_STREAMS = 16;
+const streams = new Map(); // sender id -> { x, p, next, last }
+function remoteStep(now) {
+  for (const [id, s] of streams) {
+    if (now - s.last > STALE) { streams.delete(id); continue; }
+    if (s.next < now - 400) s.next = now; // a hidden tab or a slow frame never releases a backlog
+    while (s.next <= now) {
+      spawnDrop(s.x * S.w + (Math.random() - 0.5) * 6, s.p);
+      s.next += pourEvery(s.p);
+    }
+  }
+}
+function drawMarkers(now) {
+  if (!streams.size) return;
+  const cols = colours(), h = Math.max(7, S.u * 0.2);
+  for (const s of streams.values()) {
+    const x = s.x * S.w, fade = Math.min(1, (STALE - (now - s.last)) / 1000);
+    mg.globalAlpha = 0.9 * Math.max(0, fade);
+    mg.beginPath(); mg.moveTo(x - h * 0.7, 0); mg.lineTo(x + h * 0.7, 0); mg.lineTo(x, h * 1.3); mg.closePath();
+    if (s.p === WATER) { mg.lineWidth = 1.5; mg.strokeStyle = S.theme.pin; mg.stroke(); }
+    else { mg.fillStyle = s.p === GOLD ? '#c99a2e' : cols[s.p]; mg.fill(); }
+  }
+  mg.globalAlpha = 1;
+}
+const net = (() => {
+  const me = Math.random().toString(36).slice(2, 10);
+  const room = (new URLSearchParams(location.search).get('room') || 'ink').replace(/[^a-z0-9_-]/gi, '').slice(0, 32) || 'ink';
+  const line = $('liveLine');
+  let ch = null, live = false, here = 1;
+  // Sending: at most 5 messages a second from this board, bursts of 8; a stop is always sent.
+  let tokens = 8, refill = performance.now(), on = false, sentX = 0, sentAt = 0;
+  const take = () => {
+    const now = performance.now();
+    tokens = Math.min(8, tokens + (now - refill) * 0.005); refill = now;
+    if (tokens < 1) return false;
+    tokens -= 1; return true;
+  };
+  const say = msg => { if (live) ch.send({ type: 'broadcast', event: 'm', payload: { i: me, ...msg } }); };
+  const api = {
+    send(msg) { if (take()) say(msg); },
+    pourStart(x, p) { on = take(); if (on) { say({ on: 1, x: +x.toFixed(3), c: p }); sentX = x; sentAt = performance.now(); } },
+    pourTick(x) {
+      if (!on) return;
+      const now = performance.now(), age = now - sentAt;
+      // A move is sent at most every 400 ms, and a reminder every 1.5 s while the pour holds still.
+      if ((age >= 400 && Math.abs(x - sentX) > 0.01) || age >= 1500) {
+        if (take()) { say({ on: 1, x: +x.toFixed(3), c: S.pigment }); sentX = x; sentAt = now; }
+      }
+    },
+    pourStop() { if (on) say({ on: 0 }); on = false; },
+  };
+  // Receiving: each sender gets at most 6 messages a second through; stops always get through.
+  const budget = new Map();
+  function receive(m) {
+    if (!m || typeof m.i !== 'string' || m.i === me) return;
+    const now = performance.now();
+    if (m.on === 0) { streams.delete(m.i); return; }
+    let b = budget.get(m.i);
+    if (!b) { b = { tokens: 10, t: now, rain: 0 }; budget.set(m.i, b); }
+    b.tokens = Math.min(10, b.tokens + (now - b.t) * 0.006); b.t = now;
+    if (b.tokens < 1) return;
+    b.tokens -= 1;
+    if (Number.isInteger(m.rain)) {
+      if (now - b.rain < 2500) return;
+      b.rain = now; rainFrom(m.rain); return;
+    }
+    const x = +m.x, p = m.c;
+    if (!(x >= 0 && x <= 1) || !Number.isInteger(p) || p < 0 || p > WATER) return;
+    let s = streams.get(m.i);
+    if (!s) {
+      if (streams.size >= MAX_STREAMS) return;
+      // The first drop falls at once, so a quick tap still arrives even if its stop follows straight after.
+      spawnDrop(x * S.w, p);
+      s = { next: now + pourEvery(p) }; streams.set(m.i, s);
+    }
+    s.x = x; s.p = p; s.last = now;
+  }
+  function show(state) {
+    if (state === 'off') line.textContent = 'Live pours are off: you see the shared sky and your own rain.';
+    else if (state === 'connecting') line.textContent = 'Connecting to the room…';
+    else if (state === 'lost') line.textContent = 'Live connection lost, retrying. Your board still works.';
+    else line.textContent = 'Live: ' + here + (here === 1 ? ' board' : ' boards') + ' open. Every pour falls on every board.';
+  }
+  const ready = window.supabase && /^https:\/\//.test(SUPABASE_URL) && !/^PASTE/.test(SUPABASE_KEY);
+  if (!ready) { show('off'); return api; }
+  try {
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      realtime: { params: { eventsPerSecond: 10 } },
+    });
+    ch = client.channel('pachinko-' + room, { config: { broadcast: { self: false, ack: false }, presence: { key: me } } });
+    ch.on('broadcast', { event: 'm' }, ({ payload }) => receive(payload));
+    ch.on('presence', { event: 'sync' }, () => { here = Math.max(1, Object.keys(ch.presenceState()).length); if (live) show('live'); });
+    show('connecting');
+    ch.subscribe(status => {
+      if (status === 'SUBSCRIBED') { live = true; show('live'); ch.track({}).catch(() => {}); }
+      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') { live = false; streams.clear(); show('lost'); }
+    });
+    window.addEventListener('pagehide', () => { try { ch.unsubscribe(); } catch (_) {} });
+  } catch (_) { show('off'); }
+  return api;
+})();
+
+readTheme(); paintSwatches(); resize(); showSky();
+if (!reduced && !S.sky) for (let i = 0; i < 14; i++) setTimeout(() => spawnDrop(S.w * (0.1 + Math.random() * 0.8), randomPigment()), 300 + i * 120);
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
